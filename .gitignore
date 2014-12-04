@@ -1,0 +1,13 @@
+make.sh
+*.a
+Makefile
+*.log
+.*
+!.gitignore
+cscope*
+tags*
+config.h
+config.status
+src/core/pcare
+stamp-h1
+uImage

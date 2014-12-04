@@ -1,0 +1,4 @@
+SUBDIRS=core
+CURRENTPATH=$(pwd)
+INDLUDES=-I$(CURRENTPATH)/include
+export INDLUDES
