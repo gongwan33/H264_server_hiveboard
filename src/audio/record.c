@@ -162,20 +162,13 @@ int set_alsa_record_config(snd_pcm_t *handle, unsigned rate, u16 channels, int b
 /*
  * Start recording data (alsa) ...
  */
-static int record_alsa_data(u8 *buffer, u32 buf_size)
+static int record_alsa_data(u8 *buffer, u32 buf_size, int fmtInt, int channels)
 {
 	int result, t1, t2;
 	snd_pcm_uframes_t frames; 
-	unsigned int val;
-	snd_pcm_format_t fmt;
-	int fmtInt = 2;
-	snd_pcm_hw_params_get_channels(params, &val);
-	snd_pcm_hw_params_get_format(params, &fmt);
-	if(fmt == SND_PCM_FORMAT_S16_LE)
-		fmtInt = 2;
-	else
-		fmtInt = 1;
-	frames = buf_size/(val*fmtInt);  
+
+	frames = buf_size/(channels*fmtInt);  
+	
 	result = snd_pcm_readi(handle, buffer, frames); 
     return result;
 }
@@ -208,6 +201,9 @@ void *audio_capture( void *arg )
 	struct AUDIO_CFG cfg = {RECORD_RATE,RECORD_CHANNELS,RECORD_BIT,0};
 	Buffer *buffer;
 	int rc;
+	unsigned int channels;
+    snd_pcm_format_t fmt;
+    int fmtInt = 2;
 
 	pthread_detach(pthread_self());
 	
@@ -223,9 +219,17 @@ void *audio_capture( void *arg )
                     printf("unable to open pcm device: %s/n",  snd_strerror(rc));  
 					break;  
 				}  
+				sleep(1);
                 set_alsa_record_config(handle,cfg.rate,cfg.channels,cfg.bit);
 				printf("   Recorder Start\n");
-				state = RECORDER_CAPTURE;
+				state = RECORDER_CAPTURE;				
+
+             	snd_pcm_hw_params_get_channels(params, &channels);
+	            snd_pcm_hw_params_get_format(params, &fmt);
+	            if(fmt == SND_PCM_FORMAT_S16_LE)
+					fmtInt = 2;
+				else
+					fmtInt = 1;
 				break;
 			case RECORDER_RESET:
 				printf("   Recorder Reset\n");
@@ -257,13 +261,13 @@ void *audio_capture( void *arg )
 					state = RECORDER_STOPPED;
 					break;
 				}
-                length =  record_alsa_data( buffer->data, RECORD_MAX_READ_LEN);
-                if (rc == -EPIPE) {  
+                length =  record_alsa_data( buffer->data, RECORD_MAX_READ_LEN, fmtInt, channels);
+                if (length == -EPIPE) {  
 					/* EPIPE means overrun */  
 					printf("overrun occurred/n");  
 					snd_pcm_prepare(handle);  
 					}
-				else if (rc < 0) {  
+				else if (length < 0) {  
 					printf("error from read: %s/n",snd_strerror(rc));  
 				}
 				
@@ -272,7 +276,7 @@ void *audio_capture( void *arg )
 				{
 					snd_pcm_drain(handle);  
                     snd_pcm_close(handle);
-					printf("   Record Ret Error ! length is %d\n",length);
+					printf("   Record Ret Error ! length is %d\n", length);
 					state = RECORDER_RESET;
 				}
 				else

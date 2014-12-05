@@ -25,7 +25,7 @@ extern int verify_ok;
 /* prase opcode command text */
 int prase_packet(int opcode, u8 *buf)
 {
-    //printf("opcode = %d\n", opcode);
+    printf("opcode = %d\n", opcode);
     if(verify_ok == 0){
         switch (opcode) {
         case 0:
