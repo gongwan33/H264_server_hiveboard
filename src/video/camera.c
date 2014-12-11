@@ -155,7 +155,7 @@ static void *camera_thread(void *args)
 
         if (0 == r) {
             fprintf (stderr, "select timeout,camera can be dead,system will reboot!!!\n");
-            system("reboot");
+//            system("reboot");
             return NULL;
         }
 

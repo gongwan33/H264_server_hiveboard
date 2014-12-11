@@ -49,13 +49,13 @@ int camera_setting(int camera_fd)
 	if(!H264_GetFormat(dev))
 		printf("SONiX_UVC_TestAP @main : H264 Get Format Failed\n");
 
-	cur_H264fmt.FrameRateId = 0;
-	cur_H264fmt.FmtId = 0;
+	cur_H264fmt.FrameRateId = 1;
+	cur_H264fmt.FmtId = 1;
 	if(XU_H264_SetFormat(dev, cur_H264fmt) < 0)
 		printf("SONiX_UVC_TestAP @main : H264 Set Format Failed\n");
 
 
-	m_BitRate = 2048;
+	m_BitRate = 1600;
 	if(XU_H264_Set_BitRate(dev, m_BitRate) < 0 )
 		printf("SONiX_UVC_TestAP @main : XU_H264_Set_BitRate Failed\n");
 	
