@@ -17,7 +17,7 @@
 #define AUDIO_DEV 		"plughw:0,0"
 #define PLAYBACK_DEV 	"plughw:0,0"
 //#define RECORD_RATE 		44100
-#define RECORD_RATE 		16000
+#define RECORD_RATE 		8000
 //#define RECORD_RATE 		11025
 #define AUDIO_RATE 		44100
 #define AUDIO_BIT		16
