@@ -48,8 +48,8 @@ ARFLAGS = cru
 libvideo_a_AR = $(AR) $(ARFLAGS)
 libvideo_a_LIBADD =
 am_libvideo_a_OBJECTS = camera.$(OBJEXT) v4l2.$(OBJEXT) \
-	yuv2jpg.$(OBJEXT) sonix_xu_ctrls.$(OBJEXT) \
-	SONiX_UVC_TestAP.$(OBJEXT) v4l2uvc.$(OBJEXT)
+	sonix_xu_ctrls.$(OBJEXT) SONiX_UVC_TestAP.$(OBJEXT) \
+	v4l2uvc.$(OBJEXT)
 libvideo_a_OBJECTS = $(am_libvideo_a_OBJECTS)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -152,7 +152,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libvideo.a
-libvideo_a_SOURCES = camera.c v4l2.c yuv2jpg.c sonix_xu_ctrls.c SONiX_UVC_TestAP.c v4l2uvc.c
+libvideo_a_SOURCES = camera.c v4l2.c sonix_xu_ctrls.c SONiX_UVC_TestAP.c v4l2uvc.c
 INCLUDES = -I$(top_srcdir)/src/include
 all: all-am
 
@@ -207,7 +207,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sonix_xu_ctrls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v4l2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v4l2uvc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/yuv2jpg.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

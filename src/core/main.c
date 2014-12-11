@@ -38,20 +38,6 @@ int main()
 #endif
 	init_send();
 
-#if 0
-	int i=0;
-	picture_t *pic;
-	
-	while(1){
-		if(get_picture(&pic) >= 0){
-			//store_jpg(pic);
-			put_picture(&pic);
-			//printf("%d\n", pic->index);
-			if(i++ > 8000)
-				return 0;
-		}
-	}
-#endif
     while(1)
     {
         printf(">>>>>>>>>Waiting For Client<<<<<<<<<<\n");

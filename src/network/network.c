@@ -374,67 +374,6 @@ static void keep_alive_timeout(int signo )
     close(AVcommand_fd);
     exit(0);
 }
-#if 0
-static void reset_keep_alive_timer( void )
-{
-#if 0
-    struct itimerval t;
-    t.it_interval.tv_sec = 10;
-    t.it_interval.tv_usec = 0;
-    //t.it_value.tv_sec = 10;
-    //t.it_value.tv_usec = 0;
-    setitimer(SIGALRM, &t, NULL);
-    printf("My Heart Is Beated !\n");
-    //setitimer(ITIMER_REAL, &t, NULL);
-    //setitimer(SIGALRM, &value, &ovalue); 
-#endif
-}
-#endif
-/* ---------------------------------------------------------- */
-/* deal bat info */
-void deal_bat_info()
-{
-	struct command *command252;
-	struct fetch_battery_power_resp *fetch_battery_power_resp;
-	int bat_capacity;
-
-	command252 = malloc(sizeof(struct command) + 1);
-	fetch_battery_power_resp = &command252->text[0].fetch_battery_power_resp;
-	memcpy(command252->protocol_head, str_ctl, 4);
-	command252->opcode = 252;
-	command252->text_len = 1;
-
-	bat_fp = fopen("/sys/class/power_supply/battery/capacity","r");
-	if (bat_fp == NULL)
-		//printf("open  capacity failed\n");
-		;
-	else
-		//printf("open capacity succed\n");
-		;
-
-	if ((fread(bat_info, 20, 1, bat_fp)) != 1)
-		//printf("read from bat_fd failed\n");
-		;
-
-	//printf("bat_info[0]:%d,bat_info[1]:%d,bat_info[2]:%d\n",bat_info[0],bat_info[1],bat_info[2]);
-	bat_capacity = atoi(bat_info);
-	//printf("bat_capacity:%d\n",bat_capacity);
-	if (fclose(bat_fp) != 0)
-		printf("close bat_fp failed\n");
-
-	fetch_battery_power_resp->battery = bat_capacity;
-
-	if ((send(battery_fd, command252, 24, 0)) == -1) {
-		perror("send");
-		close(battery_fd);
-        printf("========%s,%u==========\n",__FILE__,__LINE__);
-		exit(0);
-	}
-
-free_buf:
-	free(command252);
-}
-
                           
 
 /*
@@ -478,70 +417,6 @@ void enable_audio_send()
 
 }
 
-/*
- * send music player over
- */
-void send_music_played_over()
-{
-    int music_played_over_fd = AVcommand_fd;
-    struct command *command15;
-    struct music_played_over *music_played_over;
-    int send_len;
-    command15 = malloc(sizeof(struct command));
-    memcpy(command15->protocol_head, str_ctl, 4);
-    music_played_over = &command15->text[0].music_played_over;
-    command15->opcode = 15; 
-    command15->text_len = 0;
-    send_len = send(music_played_over_fd, command15, 23, 0);
-    if (send_len == -1){ 
-        perror("send");
-        close(music_played_over_fd);
-        printf("========%s,%u========\n",__FILE__,__LINE__);
-        printf("-->Send Music Is Played Over ... Failed \n");
-        exit(0);
-    }
-    else if(send_len < 23){
-        printf("-->Send Music Is Player Over ... Short \n");
-    }
-    else{
-        printf("-->Send Music Is Played Over !\n");
-    }
-    free(command15);
-    command15 = NULL;
-    return;
-}                           
-/*
- *confirm_stop 
- */
-void send_talk_end_resp()
-{
-    int talk_end_fd = AVcommand_fd;
-    struct command *command22;
-    struct talk_end_resp *talk_end_resp;
-    int send_len;
-    command22 = malloc(sizeof(struct command));
-    memcpy(command22->protocol_head, str_ctl, 4);
-    talk_end_resp = &command22->text[0].talk_end_resp;
-    command22->opcode = 22; 
-    command22->text_len = 0;
-    send_len = send(talk_end_fd, command22, 23, 0); 
-    if (send_len == -1){ 
-        perror("send");
-        close(talk_end_fd);
-        printf("========%s,%u========\n",__FILE__,__LINE__);
-        printf("-->Send Talk Stop Resp ... Failed \n");
-        exit(0);
-    }
-    else if(send_len < 23){
-        printf("-->Send Talk Stop Resp ... Short\n");
-    }
-    else{
-        printf("-->Send Talk Stop Resp !\n");
-    }
-    free(command22);
-    command22 = NULL;
-    return;
-}                           
 
 /* enable vide start */
 void send_video_start_resp()
@@ -574,83 +449,7 @@ void send_video_start_resp()
 
 	free(command5);
 }
-/* enable talk data */
-void send_talk_resp()
-{
-	int talk_fd = AVcommand_fd;
-	
-	struct command *command12;
-	struct talk_start_resp *talk_start_resp;
-    int send_len;
 
-	command12 = malloc(sizeof(struct command) + 6);
-	talk_start_resp = &command12->text[0].talk_start_resp;
-
-	memcpy(command12->protocol_head, str_ctl, 4);
-	command12->opcode = 12;
-	command12->text_len = 6;
-
-	talk_start_resp->result = 0;				/* 0 : agree */
-	talk_start_resp->data_con_ID = 0;			/* TODO (FIX ME) must be 0 */
-
-	send_len = send(talk_fd, command12, 29, 0);
-	if (send_len == -1) {
-		perror("send");
-		close(talk_fd);
-        printf("========%s,%u==========\n",__FILE__,__LINE__);
-        printf("-->Send Talk Start Resp ... Failed\n");
-		exit(0);
-	}
-    else if(send_len < 29){
-        printf("-->Send Talk Start Resp ... Short\n");
-    }
-    else{
-        printf("-->Send Talk Start Resp !\n");
-    }
-
-	free(command12);
-	command12 = NULL;
-}
-/* when step motor to the end ,send cmd to client */
-void send_alarm_notify(u8 alarm_kind)
-{
-	int alarm_fd = AVcommand_fd;
-	
-	struct command *command25;
-	struct alarm_notify *alarm_notify_r;
-    int send_len;
-
-	command25 = malloc(sizeof(struct alarm_notify)+sizeof(struct command));
-	alarm_notify_r = &command25->text[0].alarm_notify;
-
-	memcpy(command25->protocol_head, str_ctl, 4);
-	command25->opcode = 25;
-	command25->text_len = sizeof(struct alarm_notify);
-
-	alarm_notify_r->alarm_type = alarm_kind;
-    alarm_notify_r->reserve1 = 0;
-    alarm_notify_r->reserve2 = 0;
-    alarm_notify_r->reserve3 = 0;
-    alarm_notify_r->reserve4 = 0;
-	send_len = send(alarm_fd, command25, sizeof(struct command) + sizeof(struct alarm_notify), 0);
-	if (send_len == -1) {
-		perror("send");
-		close(alarm_fd);
-        printf("========%s,%u==========\n",__FILE__,__LINE__);
-        printf("-->Send Alarm_Notify ... Failed\n");
-		exit(0);
-	}
-    else if(send_len < (sizeof(struct command) + sizeof(struct alarm_notify))){
-        printf("-->Send Alarm_Notify ... Short\n");
-    }
-    else{
-        printf("-->Send Alarm_Notify !\n");
-    }
-
-	free(command25);
-	command25 = NULL;
-}
-	
 
 /*
  * disable audio data send
@@ -1196,35 +995,6 @@ free_buf:
 	pthread_exit(NULL);
 }
 
-#if 0
-int pic_cnt=0;
-
-void sigalarm_handler(int sig)
-{
-	printf("fps=%d\n", pic_cnt);
-	pic_cnt = 0;
-}
-
-
-int init_timer(void)
-{
-	struct itimerval itv;
-	int ret;
-
-	signal(SIGALRM, sigalrm_handler);
-	itv.it_interval.tv_sec = 1;
-	itv.it_interval.tv_usec = 0;
-	itv.it_value.tv_sec = 1;
-	itv.it_value.tv_usec = 0;
-	
-	ret = setitimer(ITIMER_REAL, &itv, NULL);
-	if ( ret != 0){
-		printf("Set timer error. %s \n", strerror(errno) );
-		return -1;
-	}
-	printf("add timer\n");
-}
-#endif
 
 /* ------------------------------------------- */
 
