@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include "sonix_xu_ctrls.h"
+#include "v4l2uvc.h"
+#include "v4l2.h"
 
 
 struct H264Format *gH264fmt = NULL;
@@ -58,6 +60,46 @@ int camera_setting(int camera_fd)
 	m_BitRate = 1600;
 	if(XU_H264_Set_BitRate(dev, m_BitRate) < 0 )
 		printf("SONiX_UVC_TestAP @main : XU_H264_Set_BitRate Failed\n");
+
+
+    v4l2ResetControl (dev, V4L2_CID_BRIGHTNESS);
+	v4l2ResetControl (dev, V4L2_CID_SATURATION);
+	v4l2ResetControl (dev, V4L2_CID_CONTRAST);
+	v4l2ResetControl (dev, V4L2_CID_GAIN);
+	v4l2ResetControl (dev, V4L2_CID_HUE);
+	v4l2ResetControl (dev, V4L2_CID_WHITE_BALANCE_TEMPERATURE);
+	v4l2ResetControl (dev, V4L2_CID_GAMMA);
+
+
+/*
+	v4l2SetControl (dev, V4L2_CID_SATURATION, 80);
+	v4l2SetControl (dev, V4L2_CID_CONTRAST, 50);
+	v4l2SetControl (dev, V4L2_CID_BRIGHTNESS, 30);
+	v4l2SetControl (dev, V4L2_CID_GAIN, 40);
+	v4l2SetControl (dev, V4L2_CID_HUE, 40);
+	v4l2SetControl (dev, V4L2_CID_WHITE_BALANCE_TEMPERATURE, 5200);
+	v4l2SetControl (dev, V4L2_CID_GAMMA, 100);
+
+	int setval = v4l2GetControl (dev, V4L2_CID_WHITE_BALANCE_TEMPERATURE);
+	printf("white balance: %d\n", setval);
 	
+	setval = v4l2GetControl (dev, V4L2_CID_SATURATION);
+	printf("saturtion: %d\n", setval);
+
+	setval = v4l2GetControl (dev, V4L2_CID_CONTRAST);
+	printf("contrast: %d\n", setval);
+
+	setval = v4l2GetControl (dev, V4L2_CID_BRIGHTNESS);
+	printf("brightness: %d\n", setval);
+
+	setval = v4l2GetControl (dev, V4L2_CID_GAIN);
+	printf("gain: %d\n", setval);
+
+    setval = v4l2GetControl (dev, V4L2_CID_HUE);
+	printf("hue: %d\n", setval);
+
+	setval = v4l2GetControl (dev, V4L2_CID_GAMMA);
+	printf("gamma: %d\n", setval);
+	*/	
 }
 
