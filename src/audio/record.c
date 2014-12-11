@@ -142,8 +142,8 @@ int set_alsa_record_config(snd_pcm_t *handle, unsigned rate, u16 channels, int b
 	/* 44100 bits/second sampling rate (CD quality) */  
 	val = rate;  
 	snd_pcm_hw_params_set_rate_near(handle, params,  &val, &dir);  
-	/* Set period size to 32 frames. */  
-	frames = 32;  
+	/* Set period size to 1024 frames. */  
+	frames = 1024; 
 	snd_pcm_hw_params_set_period_size_near(handle,  params, &frames, &dir);  
 	/* Write the parameters to the driver */  
 	rc = snd_pcm_hw_params(handle, params);  
@@ -221,7 +221,6 @@ void *audio_capture( void *arg )
 				}  
 				sleep(1);
                 set_alsa_record_config(handle,cfg.rate,cfg.channels,cfg.bit);
-				printf("   Recorder Start\n");
 				state = RECORDER_CAPTURE;				
 
              	snd_pcm_hw_params_get_channels(params, &channels);
@@ -311,6 +310,13 @@ void *audio_send( void *arg )
 	int total_send_time = 0, send_cnt = 0, send_time, max_send_time = 0;
 #endif
 
+//#define FILE_RE
+
+#ifdef FILE_RE
+	FILE *fp ;
+#endif
+
+
 	pthread_detach(pthread_self());
 	do
 	{
@@ -318,6 +324,10 @@ void *audio_send( void *arg )
 		{
 			case SOCKET_INIT:
 				printf("   Sender Init\n");
+#ifdef FILE_RE
+				if(  (fp =fopen("sound.wav","w")) < 0)
+					printf("file open failed\n");
+#endif
 				OpenQueueOut(CAPTURE_QUEUE);
 				adpcm_state.valprev = 0;
 				adpcm_state.index = 0;
@@ -338,6 +348,9 @@ void *audio_send( void *arg )
 				gettimeofday(&t2,NULL);
 #endif
                 memcpy((u8 *)&g_raw_buffer[0][RECORD_ADPCM_MAX_READ_LEN], (u8 *)(&adpcm_state), 3);
+#ifdef FILE_RE
+                fwrite( buffer->data,1, 2048,fp);
+#endif
                 adpcm_coder( (short *)buffer->data, g_raw_buffer[0],RECORD_MAX_READ_LEN,&adpcm_state);
 				error_flag = send_audio_data(g_raw_buffer[0],RECORD_ADPCM_MAX_READ_LEN,buffer->time_stamp);
 #ifdef CAPTURE_PROFILE
@@ -375,6 +388,10 @@ void *audio_send( void *arg )
 				break;
 		}
 	}while(1);
+
+#ifdef FILE_RE
+	fclose(fp);
+#endif
 
 	pthread_exit(NULL);
 }

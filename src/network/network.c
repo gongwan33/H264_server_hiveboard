@@ -812,9 +812,9 @@ int send_audio_data(u8 *audio_buf, u32 data_len,struct timeval t1)
 	av_command2->text_len = data_len + 20;			/* contant sample and index */
 	audio_data->ado_len = data_len;
     audio_data->time_stamp = TIME_DIFF(t1,av_start_time);
-    if(audio_data->time_stamp - pre_time_stamp > 100){
-        printf("   Audio Cost Time is %d\n",audio_data->time_stamp - pre_time_stamp);
-    }
+  //  if(audio_data->time_stamp - pre_time_stamp > 100){
+  //      printf("   Audio Cost Time is %d\n",audio_data->time_stamp - pre_time_stamp);
+   // }
     pre_time_stamp = audio_data->time_stamp;
 	p = (char *)av_command2;
     //printf("audio_data time_stamp is %lu\n",audio_data->time_stamp);
@@ -1361,24 +1361,6 @@ void network(void)
 #ifdef ENABLE_VIDEO
 			sem_post(&start_camera);		/* start video only when cellphone send request ! */
 #endif
-		}
-		else if (flag == 3){
-            flag = 3;
-            // close(music_data_fd);
-            if(music_data_fd != -1)
-            {
-                close(*client_fd);
-                free(client_fd);
-                printf("-->Error: Muisc Is Working Now ! Reject Request!\n");
-            }
-            else{
-                music_data_fd = *client_fd;
-		free(client_fd);
-                /* TODO just want to erase the no using data int the new socket buffer */
-                //clear_recv_buf(music_data_fd);
-                /* when the new socket is connected, then tell the cellphone to start sending file */
-                sem_post(&start_talk);
-            }
 		}
 	}
 	pthread_join(th1, NULL);
