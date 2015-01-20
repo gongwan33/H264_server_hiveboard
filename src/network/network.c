@@ -30,9 +30,14 @@
 #include "utils.h"
 #include "wifi_debug.h"
 
+#include "p2p/JEAN_P2P.h"
+
 /* ---------------------------------------------------------- */
 
-#define SERVER_PORT 80
+#define local_port 6788
+#define server_port 61000
+#define server_ip "192.168.1.109"
+
 #define BACKLOG 	10
 /*#define BLOWFISH_DEBUG*/
 
@@ -219,7 +224,6 @@ int verify_ok = 0;
 int send_audio_flag = 1;
 
 /* audio param */
-static int AVcommand_fd;
 static struct timeval av_start_time={0,0};
 
 /* TODO commands list */
@@ -246,8 +250,6 @@ sem_t start_talk;
 FILE *bat_fp;
 int bat_info[20]={0};
 u32 battery_fd;
-
-int picture_fd, audio_data_fd, music_data_fd=-1;
 
 pthread_mutex_t AVsocket_mutex;
 
@@ -371,7 +373,6 @@ void BlowfishDecrption(unsigned long *szMessage,int len)
 static void keep_alive_timeout(int signo )
 {
     printf("Err:keep alive timeout!\n");
-    close(AVcommand_fd);
     exit(0);
 }
                           
@@ -381,7 +382,6 @@ static void keep_alive_timeout(int signo )
  */
 void enable_audio_send()
 {
-	int audio_fd = AVcommand_fd;
 	
 	struct command *command9;
 	struct audio_start_resp *audio_start_resp;
@@ -397,10 +397,9 @@ void enable_audio_send()
 	audio_start_resp->result = 0;				/* 0 : agree */
 	audio_start_resp->data_con_ID = 0;			/* TODO (FIX ME) must be 0 */
 
-	send_len = send(audio_fd, command9, 29, 0);
+	send_len = send_cmd((char *)command9, 29);
 	if (send_len == -1) {
 		perror("send");
-		close(audio_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
         printf("-->Send Audio Resp ... Failed !!\n");
 		exit(0);
@@ -421,8 +420,6 @@ void enable_audio_send()
 /* enable vide start */
 void send_video_start_resp()
 {
-	int video_fd = AVcommand_fd;
-	
 	struct command *command5;
 	struct video_start_resp *_video_start_resp;
     int send_len=0, text_size = 0, n = 0;
@@ -439,9 +436,8 @@ void send_video_start_resp()
 	_video_start_resp->result = 0;					/* agree for connection */
 	_video_start_resp->data_con_ID = data_ID;		/* TODO ID */
 
-	if ((n = send(video_fd, command5, 29, 0)) == -1) {
+	if ((n = send_cmd((char *)command5, 29)) == -1) {
 		perror("send");
-		close(video_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(0);
 	}
@@ -469,10 +465,9 @@ static int recv_AVcommand(u32 client_fd)
 	memset(buffer2, 0, 100);
 
 	/* read AVdata connection command from user(client) */
-	if ((n = recv(client_fd, buffer2, 100, 0)) == -1)
+	if ((n = recv_cmd(buffer2, 100)) == -1)
 	{
 		perror("recv");
-		close(client_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(0);
 	}
@@ -532,7 +527,7 @@ void send_picture(char *data, u32 length,struct timeval t1)
 	while( total_send_len < 36 )
 	{
 		/*gettimeofday(&t1,NULL);*/
-		send_len = send(picture_fd, (void *)&p[total_send_len], 36-total_send_len, 0);
+		send_len = JEAN_send_master((void *)&p[total_send_len], 36-total_send_len, 4, 0);
 		/*gettimeofday(&t2,NULL);*/
 		if (send_len <= 0) {
 			perror("#send_header");
@@ -561,7 +556,7 @@ void send_picture(char *data, u32 length,struct timeval t1)
 	while( total_send_len < length )
 	{
 		/*gettimeofday(&t1,NULL);*/
-		send_len = send(picture_fd, (void *)&p[total_send_len], length-total_send_len, 0);
+		send_len = JEAN_send_master((void *)&p[total_send_len], length-total_send_len, 4, 0);
 		/*gettimeofday(&t2,NULL);*/
 		if (send_len <= 0) {
 			perror("#send_pic");
@@ -588,7 +583,6 @@ void send_picture(char *data, u32 length,struct timeval t1)
 	pthread_mutex_unlock(&AVsocket_mutex);
 	return;
 err_exit:
-	close(picture_fd);
 	printf("#send picture failed, exit to restart!\n");
 	exit(0);
 	return;
@@ -624,7 +618,7 @@ int send_audio_data(u8 *audio_buf, u32 data_len,struct timeval t1)
 	while( total_send_len < 40 )
 	{
         /*gettimeofday(&t1,NULL);*/
-		send_len = send(audio_data_fd, (void *)&p[total_send_len], 40-total_send_len, 0);
+		send_len = JEAN_send_master((void *)&p[total_send_len], 40-total_send_len, 4, 0);
 		/*gettimeofday(&t2,NULL);*/
 		if (send_len <= 0) {
 			perror("#send_audio_header");
@@ -652,7 +646,7 @@ int send_audio_data(u8 *audio_buf, u32 data_len,struct timeval t1)
 	p = audio_buf;
 	while( total_send_len < length )
 	{
-		send_len = send(audio_data_fd, (void *)&p[total_send_len], length-total_send_len, 0);
+		send_len = JEAN_send_master((void *)&p[total_send_len], length-total_send_len, 4, 0);
 		if (send_len <= 0) {
 			perror("#send_audio");
 			if( errno != EAGAIN || retry_num >= MAX_RETRY_NUM )
@@ -680,7 +674,6 @@ int send_audio_data(u8 *audio_buf, u32 data_len,struct timeval t1)
 
 	return 1;
 err_exit:
-	close(audio_data_fd);
     printf("#errno is %d, retry_num is %d\n",errno,retry_num);
 	printf("#send audio data failed, exit to restart!\n");
 	exit(0);
@@ -690,7 +683,6 @@ err_exit:
 /* TODO keep opcode connection, every 1 minute, or network will be disconnected */
 void keep_connect(void)
 {
-	int client_fd = AVcommand_fd;
     struct keep_alive_resp *keep_alive_resp;
 	
     keep_alive_resp = &command254->text[0].keep_alive_resp;
@@ -698,22 +690,21 @@ void keep_connect(void)
 	command254->text_len = 0;
 
 	/* write command to client --- keep alive */
-	if (send(client_fd, command254, 23, 0) == -1) {
+	if (send_cmd((char *)command254, 23) == -1) {
 		perror("send");
-		close(client_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(0);
 	}
 }
 
-int read_client( int fd, char *buf, int len )
+int read_client(char *buf, int len )
 {
     int n;
     int recv_len = 0;
     char *p = buf;
 	while ( recv_len < len )
     {
-           n =recv(fd, p, len-recv_len, 0);
+           n = recv_cmd(p, len-recv_len);
            if( n <= 0 )
            {
                 printf("==recv err(%d): n=%d recv_len=%d======\n",errno,n,recv_len);
@@ -733,7 +724,6 @@ int read_client( int fd, char *buf, int len )
 /* deal_verify_req */
 void deal_verify_req(u8 * buf)
 {
-    int client_fd = AVcommand_fd;
 	struct verify_req *_verify_req;
 	struct verify_resp *_verify_resp;
     struct command *command3;
@@ -781,9 +771,8 @@ void deal_verify_req(u8 * buf)
     _verify_resp->reserve = 0;				/* exist when result is 0 */
 
 	/* write command 3 to client */
-	if ((n = send(client_fd, command3, sizeof(struct command) + 3, 0)) == -1) {
+	if ((n = send_cmd((char *)command3, sizeof(struct command) + 3)) == -1) {
 		perror("send");
-		close(client_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(0);
     }
@@ -795,7 +784,6 @@ void deal_verify_req(u8 * buf)
 /* deal_login_req */
 void deal_login_req(u8 * buf)
 {
-    int client_fd = AVcommand_fd;
 	struct login_req *_login_req;
 	struct login_resp *_login_resp;
     struct command *command1;
@@ -839,9 +827,8 @@ void deal_login_req(u8 * buf)
     _login_resp->ch_num4=Send_num[3];
 
 	/* write command1 to client */
-	if ((n = send(client_fd, command1, sizeof(struct command) + text_size, 0)) == -1) {
+	if ((n = send_cmd((char *)command1, sizeof(struct command) + text_size)) == -1) {
 		perror("send");
-		close(client_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(0);
 	}
@@ -851,21 +838,18 @@ void deal_login_req(u8 * buf)
 /* ------------------------------------------- */
 
 /* set opcode connection */
-void set_opcode_connection(u32 client_fd)
+void set_opcode_connection()
 {
 	int n;
 	int i;
 	int text_len;
-	/* ------------------------------------------- */
-	battery_fd = client_fd;
 
 #ifdef BLOWFISH
     BlowfishKeyInit(BLOWFISH_KEY,strlen(BLOWFISH_KEY));
 #else
 	/* TODO read first command 0 from client */
-	if ((n = recv(client_fd, buffer, 100, 0)) == -1) {
+	if ((n = recv_cmd(buffer, 100)) == -1) {
 		perror("recv");
-		close(client_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(0);
 	}
@@ -890,9 +874,8 @@ void set_opcode_connection(u32 client_fd)
 	memcpy(login_resp->camera_version, str_camVS, sizeof(str_camVS));
 
 	/* write command1 to client */
-	if ((n = send(client_fd, command1, 53, 0)) == -1) {
+	if ((n = send_cmd(command1, 53)) == -1) {
 		perror("send");
-		close(client_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(0);
 	}
@@ -900,7 +883,7 @@ void set_opcode_connection(u32 client_fd)
 #ifdef BLOWFISH
 #else
 	/* read command from client */
-	if ((n = recv(client_fd, buffer, 100, 0)) == -1) {
+	if ((n = recv_cmd(buffer, 100)) == -1) {
 		perror("recv");
 		close(client_fd);
         printf("========%s,%u==========\n",__FILE__,__LINE__);
@@ -935,7 +918,7 @@ void set_opcode_connection(u32 client_fd)
         /* read command from client */
         do
         {
-            if( read_client( client_fd, buffer, sync_len ) != sync_len )
+            if( read_client(buffer, sync_len ) != sync_len )
             {
                 printf("phone closed command socket! restart!\n");
                 exit(0);
@@ -943,12 +926,11 @@ void set_opcode_connection(u32 client_fd)
             if(strncmp(buffer,str_ctl,sync_len))
             {
                 printf("command's head is %lx\nstr_ctl is %s\n",(*(unsigned long *)buffer),str_ctl);
-                //clear_recv_buf(client_fd);
             }
             else
                 sync_ok = 1;
         }while(!sync_ok);
-        if( read_client( client_fd, buffer, 23-sync_len ) != 23-sync_len )
+        if( read_client(buffer, 23-sync_len ) != 23-sync_len )
         {
             printf("phone closed command socket! restart!\n");
             exit(0);
@@ -960,7 +942,7 @@ void set_opcode_connection(u32 client_fd)
             printf("bad text_len!\n");
             continue;
         }
-        if( read_client( client_fd, buffer, text_len ) != text_len )
+        if( read_client(buffer, text_len ) != text_len )
         {
             printf("phone closed command socket! restart!\n");
             exit(0);
@@ -976,22 +958,18 @@ void set_opcode_connection(u32 client_fd)
 /* opcode connect working thread */
 void *deal_opcode_request(void *arg)
 {
-	int client_fd = *((int *)arg);
 
 	/* seperate mode, free source when thread working is over */
 	pthread_detach(pthread_self());
 
 	/* set connection */
-	set_opcode_connection(client_fd);
+	set_opcode_connection();
 
 free_buf:
 	/* malloc in the connect() */
 	free(command254);
-	/* malloc in the main() */
-	free(arg);
 	/* buffer malloc */
 	free(buffer);
-	close(client_fd);
 	pthread_exit(NULL);
 }
 
@@ -1000,16 +978,8 @@ free_buf:
 
 /* TODO wifi main function, later will be called in the main thread in core/main.c */
 void network(void)
-{
-	int server_fd, *client_fd;
-	struct sockaddr_in server_addr;
-	struct sockaddr_in client_addr;
-    in_addr_t current_client_address =0;
-    int sin_size;
-    int opt = 1;							/* allow server address reuse */
-	int flag = 1;							/* TODO thread flag */
-	int nagle_flag = 1;						/* disable Nagle */
-	
+{   
+	int ret = 0;	
 	/* malloc buffer for socket read/write */
 	buffer = malloc(100);					/* TODO */
 	buffer2 = malloc(100);					/* TODO */
@@ -1017,129 +987,63 @@ void network(void)
 	text = malloc(100);						/* TODO */
 
 
-	/* create socket */
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (-1 == server_fd) {
-		perror("socket");
+	ret = JEAN_init_master(server_port, local_port, server_ip);
+	if (-1 == ret) {
+		perror("JEAN p2p init error");
         printf("========%s,%u==========\n",__FILE__,__LINE__);
 		exit(1);
 	}
-	
-	/* allow server ip address reused */
-	setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-	/* disable the Nagle (TCP No Delay) algorithm */
-	setsockopt(server_fd, IPPROTO_TCP, TCP_NODELAY, (char *)&nagle_flag, sizeof(nagle_flag));
 
-	/* set server message */
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(SERVER_PORT);
-	server_addr.sin_addr.s_addr = inet_addr("192.168.1.44");
-	bzero(&(server_addr.sin_zero), 8);
-	
-	/* bind port */
-    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1) {
-        perror("bind");
-        close(server_fd);
+	ret = init_CMD_CHAN();
+	if (-1 == ret) {
+		perror("JEAN p2p init error");
         printf("========%s,%u==========\n",__FILE__,__LINE__);
-        exit(1);
-    }
+		exit(1);
+	}
 
-    /* start listening */
-    if (listen(server_fd, BACKLOG) == -1) {
-        perror("listen");
-        close(server_fd);
-        printf("========%s,%u==========\n",__FILE__,__LINE__);
-        exit(1);
-    }
-
-    /* ---------------------------------------------------------------------------- */
+	/* ---------------------------------------------------------------------------- */
 	pthread_t th1;				/* main thread for opcode command */
 
 	if (pthread_mutex_init(&AVsocket_mutex, NULL) != 0) {
 		perror("Mutex initialization failed!\n");
 		return;
 	}
-	
-	while (1) {
 
-		sin_size = sizeof(struct sockaddr_in);
+	/* create a new thread for each client request */
 
-		/* must request dynamicly, for diff threads */
-		client_fd = (int *)malloc(sizeof(int));
-		
-		if ((*client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &sin_size)) == -1) {
-			perror("accept");
-			continue;
-		}
+	command254 = malloc(sizeof(struct command));
+	memcpy(command254->protocol_head, str_ctl, 4);
+	/* ----------------------------------------------------------------- */
+	if(pthread_create(&th1, NULL, deal_opcode_request, NULL) != 0) {
+		perror("pthread_create");
+		printf(">>>>>in video or record data connection<<<<<\n");
+		/* ----------------------------------------------------------------- */
 
-		printf("<--Got Connection From %s\n", inet_ntoa(client_addr.sin_addr));
-        if(current_client_address == 0)
-            current_client_address =client_addr.sin_addr.s_addr;
-        else if (current_client_address != client_addr.sin_addr.s_addr)
-        {
-            printf("-->Rejected !!!! Already a client conected!\n");
-            free(client_fd);
-            continue;
-        }
+		av_command1 = malloc(sizeof(struct command) + 13);
+		video_data = &av_command1->text[0].video_data;
+		memcpy(av_command1->protocol_head, str_data, 4);
+		av_command1->opcode = 1;
+		memset(video_data, 0, 13);
 
+		av_command2 = malloc(sizeof(struct command) + 17);
+		audio_data = &av_command2->text[0].audio_data;
+		memcpy(av_command2->protocol_head, str_data, 4);
+		av_command2->opcode = 2;
+		memset(audio_data, 0, 17);
 
-		/* TODO(FIX ME): disable the Nagle (TCP No Delay) algorithm */
-		setsockopt(*client_fd, IPPROTO_TCP, TCP_NODELAY, (char *)&nagle_flag, sizeof(nagle_flag));
-
-        /* create a new thread for each client request */
-        if (flag == 1) {
-            int timeout = 10000;
-            flag = 2;
-            AVcommand_fd = *client_fd;
-            free(client_fd);
-            setsockopt(AVcommand_fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
-            /* ----------------------------------------------------------------- */
-
-
-            command254 = malloc(sizeof(struct command));
-            memcpy(command254->protocol_head, str_ctl, 4);
-            /* ----------------------------------------------------------------- */
-            if(pthread_create(&th1, NULL, deal_opcode_request, &AVcommand_fd) != 0) {
-                perror("pthread_create");
-                break;
-            }
-        } else if (flag == 2){
-		struct timeval timeout = {0,500000};
-            flag = 3;
-            printf(">>>>>in video or record data connection<<<<<\n");
-            /* ----------------------------------------------------------------- */
-
-			picture_fd = *client_fd;					
-			audio_data_fd = *client_fd;
-			free(client_fd);
-			
-			av_command1 = malloc(sizeof(struct command) + 13);
-			video_data = &av_command1->text[0].video_data;
-			memcpy(av_command1->protocol_head, str_data, 4);
-			av_command1->opcode = 1;
-			memset(video_data, 0, 13);
-
-			av_command2 = malloc(sizeof(struct command) + 17);
-			audio_data = &av_command2->text[0].audio_data;
-			memcpy(av_command2->protocol_head, str_data, 4);
-			av_command2->opcode = 2;
-			memset(audio_data, 0, 17);
-			
-			setsockopt(picture_fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-			gettimeofday(&av_start_time,NULL);
-			/* ----------------------------------------------------------------- */
+		gettimeofday(&av_start_time,NULL);
+		/* ----------------------------------------------------------------- */
 #ifdef ENABLE_VIDEO
-			sem_post(&start_camera);		/* start video only when cellphone send request ! */
+		sem_post(&start_camera);		/* start video only when cellphone send request ! */
 #endif
-		}
 	}
 	pthread_join(th1, NULL);
 
 	pthread_mutex_destroy(&AVsocket_mutex);
-	
+
 	free(av_command1);
 	free(av_command2);
 
-	close(picture_fd);
-	close(server_fd);
+	close_CMD_CHAN();
+	JEAN_close_master();
 }

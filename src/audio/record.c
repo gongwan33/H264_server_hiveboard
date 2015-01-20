@@ -263,7 +263,7 @@ void *audio_capture( void *arg )
                 length =  record_alsa_data( buffer->data, RECORD_MAX_READ_LEN, fmtInt, channels);
                 if (length == -EPIPE) {  
 					/* EPIPE means overrun */  
-					printf("overrun occurred/n");  
+					printf("overrun occurred\n");  
 					snd_pcm_prepare(handle);  
 					}
 				else if (length < 0) {  

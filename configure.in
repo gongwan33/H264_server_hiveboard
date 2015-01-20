@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([src/core/main.c], [1.0], [chenguangming@wxseuic.com])
+AC_INIT([src/core/main.c], [1.0], [gongwan33@126.com])
 AC_CONFIG_SRCDIR([src/audio/audio.c])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE(wificar,1.0)
@@ -31,4 +31,5 @@ AC_OUTPUT([Makefile
                  src/audio/Makefile
                  src/core/Makefile
                  src/network/Makefile
-                 src/video/Makefile])
+                 src/video/Makefile
+				 src/p2p_master/Makefile])
