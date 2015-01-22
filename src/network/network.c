@@ -947,7 +947,7 @@ void set_opcode_connection()
             printf("phone closed command socket! restart!\n");
             exit(0);
         }
-        /*printf("opcode:%d, text_len:%d\n", opcode, text_len);*/
+        //printf("opcode:%d, text_len:%d\n", opcode, text_len);
         if (prase_packet(opcode, buffer) == -1)
             continue;
     }
@@ -994,6 +994,7 @@ void network(void)
 		exit(1);
 	}
 
+	sleep(1);
 	ret = init_CMD_CHAN();
 	if (-1 == ret) {
 		perror("JEAN p2p init error");
@@ -1010,37 +1011,36 @@ void network(void)
 	}
 
 	/* create a new thread for each client request */
+	/* ----------------------------------------------------------------- */
+
+	av_command1 = malloc(sizeof(struct command) + 13);
+	video_data = &av_command1->text[0].video_data;
+	memcpy(av_command1->protocol_head, str_data, 4);
+	av_command1->opcode = 1;
+	memset(video_data, 0, 13);
+
+	av_command2 = malloc(sizeof(struct command) + 17);
+	audio_data = &av_command2->text[0].audio_data;
+	memcpy(av_command2->protocol_head, str_data, 4);
+	av_command2->opcode = 2;
+	memset(audio_data, 0, 17);
+
+	gettimeofday(&av_start_time,NULL);
+	/* ----------------------------------------------------------------- */
 
 	command254 = malloc(sizeof(struct command));
 	memcpy(command254->protocol_head, str_ctl, 4);
 	/* ----------------------------------------------------------------- */
 	if(pthread_create(&th1, NULL, deal_opcode_request, NULL) != 0) {
 		perror("pthread_create");
+	}
 		printf(">>>>>in video or record data connection<<<<<\n");
-		/* ----------------------------------------------------------------- */
-
-		av_command1 = malloc(sizeof(struct command) + 13);
-		video_data = &av_command1->text[0].video_data;
-		memcpy(av_command1->protocol_head, str_data, 4);
-		av_command1->opcode = 1;
-		memset(video_data, 0, 13);
-
-		av_command2 = malloc(sizeof(struct command) + 17);
-		audio_data = &av_command2->text[0].audio_data;
-		memcpy(av_command2->protocol_head, str_data, 4);
-		av_command2->opcode = 2;
-		memset(audio_data, 0, 17);
-
-		gettimeofday(&av_start_time,NULL);
-		/* ----------------------------------------------------------------- */
 #ifdef ENABLE_VIDEO
 		sem_post(&start_camera);		/* start video only when cellphone send request ! */
 #endif
-	}
 	pthread_join(th1, NULL);
-
+while(1);
 	pthread_mutex_destroy(&AVsocket_mutex);
-
 	free(av_command1);
 	free(av_command2);
 
