@@ -4550,7 +4550,7 @@ fi
 done
 
 
-ac_config_files="$ac_config_files Makefile src/Makefile src/audio/Makefile src/core/Makefile src/network/Makefile src/video/Makefile src/p2p_master/Makefile"
+ac_config_files="$ac_config_files Makefile src/Makefile src/audio/Makefile src/core/Makefile src/network/Makefile src/video/Makefile src/p2p_master/Makefile src/slice_analyse/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -5290,6 +5290,7 @@ do
     "src/network/Makefile") CONFIG_FILES="$CONFIG_FILES src/network/Makefile" ;;
     "src/video/Makefile") CONFIG_FILES="$CONFIG_FILES src/video/Makefile" ;;
     "src/p2p_master/Makefile") CONFIG_FILES="$CONFIG_FILES src/p2p_master/Makefile" ;;
+    "src/slice_analyse/Makefile") CONFIG_FILES="$CONFIG_FILES src/slice_analyse/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

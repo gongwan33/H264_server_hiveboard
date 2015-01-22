@@ -1,3 +1,6 @@
+#ifndef JEAN_P2P_H
+#define JEAN_P2P_H
+
 int JEAN_init_master(int serverPort, int localPort, char *setIp);
 int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char video_analyse);
 int JEAN_recv_master(char *data, int len, unsigned char priority, unsigned char video_analyse);
@@ -10,3 +13,5 @@ int init_CMD_CHAN();
 int close_CMD_CHAN();
 int send_cmd(char *data, int len);
 int recv_cmd(char *data, int len);
+
+#endif

@@ -32,4 +32,5 @@ AC_OUTPUT([Makefile
                  src/core/Makefile
                  src/network/Makefile
                  src/video/Makefile
-				 src/p2p_master/Makefile])
+				 src/p2p_master/Makefile
+				 src/slice_analyse/Makefile])
