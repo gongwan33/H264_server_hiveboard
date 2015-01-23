@@ -523,63 +523,12 @@ void send_picture(char *data, u32 length,struct timeval t1)
 	video_data->frame_time = pic_num++;				/* test for time stamp */
 
 	pthread_mutex_lock(&AVsocket_mutex);
-	p = (char *)av_command1;
-	while( total_send_len < 36 )
-	{
-		/*gettimeofday(&t1,NULL);*/
-		send_len = JEAN_send_master((void *)&p[total_send_len], 36-total_send_len, 4, 0);
-		/*gettimeofday(&t2,NULL);*/
-		if (send_len <= 0) {
-			perror("#send_header");
-			if( errno != EAGAIN || retry_num >= MAX_RETRY_NUM )
-			{
-				goto err_exit;
-			}
-			else
-			{
-				retry_num++;
-				usleep(500000);
-			}
-		}
-		else
-		{
-			total_send_len += send_len;
-			if (total_send_len < 36)
-			{
-				printf("#opcode header short send(%d/36)!\n",total_send_len);
-			}
-			retry_num = 0;
-		}
-	}
-	total_send_len = 0;
-	p = data;
-	while( total_send_len < length )
-	{
-		/*gettimeofday(&t1,NULL);*/
-		send_len = JEAN_send_master((void *)&p[total_send_len], length-total_send_len, 4, 0);
-		/*gettimeofday(&t2,NULL);*/
-		if (send_len <= 0) {
-			perror("#send_pic");
-			if( errno != EAGAIN || retry_num >= MAX_RETRY_NUM )
-			{
-				goto err_exit;
-			}
-			else
-			{
-				retry_num++;
-				usleep(500000);
-			}
-		}
-		else
-		{
-			total_send_len += send_len;
-			if (total_send_len < length)
-			{
-				printf("#picture short send(%d/%d)!\n",total_send_len,length);
-			}
-			retry_num = 0;
-		}
-	}
+	p = (char *)malloc(sizeof(struct command) + length + 13);
+	memcpy(p, (char *)av_command1, sizeof(struct command) + 13);
+	memcpy(p + sizeof(struct command) + 13, data, length);
+	send_len = JEAN_send_master(p, sizeof(struct command) + length + 13, 0, 1, 61);
+	free(p);
+
 	pthread_mutex_unlock(&AVsocket_mutex);
 	return;
 err_exit:
@@ -618,7 +567,7 @@ int send_audio_data(u8 *audio_buf, u32 data_len,struct timeval t1)
 	while( total_send_len < 40 )
 	{
         /*gettimeofday(&t1,NULL);*/
-		send_len = JEAN_send_master((void *)&p[total_send_len], 40-total_send_len, 4, 0);
+		send_len = JEAN_send_master((void *)&p[total_send_len], 40-total_send_len, 4, 0, 0);
 		/*gettimeofday(&t2,NULL);*/
 		if (send_len <= 0) {
 			perror("#send_audio_header");
@@ -646,7 +595,7 @@ int send_audio_data(u8 *audio_buf, u32 data_len,struct timeval t1)
 	p = audio_buf;
 	while( total_send_len < length )
 	{
-		send_len = JEAN_send_master((void *)&p[total_send_len], length-total_send_len, 4, 0);
+		send_len = JEAN_send_master((void *)&p[total_send_len], length-total_send_len, 4, 0, 0);
 		if (send_len <= 0) {
 			perror("#send_audio");
 			if( errno != EAGAIN || retry_num >= MAX_RETRY_NUM )

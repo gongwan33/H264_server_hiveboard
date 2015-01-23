@@ -17,6 +17,7 @@
 #include <p2p/commonkey.h>
 #include <p2p/ring.h>
 #include <p2p/DSet.h>
+#include <slice_analyse.h>
 
 #define MAX_TRY 10
 #define SEND_BUFF_SIZE 1024*3
@@ -926,11 +927,36 @@ int JEAN_init_master(int serverPort, int localPort, char *setIp)
 	return 0;
 }
 
-int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char video_analyse)
+int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char video_analyse, int video_head_len)
 {
 	int sendLen = 0;
     char *buffer;
 	struct load_head lHead;
+	NALU_t nalu;
+
+	if(video_analyse >= 1)
+	{
+		GetAnnexbNALU (data + video_head_len, len - video_head_len, &nalu);
+		switch(nalu.nal_unit_type)
+		{
+			case NALU_TYPE_IDR:
+				priority = 8;
+				break;
+			case NALU_TYPE_SLICE:
+			case NALU_TYPE_DPA:
+			case NALU_TYPE_DPB:
+			case NALU_TYPE_DPC:
+				priority = 0;
+				break;
+			case NALU_TYPE_SEI:
+			case NALU_TYPE_PPS:
+			case NALU_TYPE_SPS:
+				priority = 8;
+				break;
+			default:
+				priority = 0;
+		}
+	}
 
 	buffer = (char *)malloc(len + sizeof(struct load_head));
 	memcpy(lHead.logo, "JEAN", 4);
@@ -954,7 +980,6 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 	{
 #endif
 
-
     if(connectionStatus == P2P)
 	{
 	    sendLen = sendto(sockfd, buffer, len + sizeof(lHead), 0, (struct sockaddr *)&slave_sin, sizeof(struct sockaddr_in));
@@ -974,6 +999,9 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 
 	if(priority > 0)
 		reg_buff(sendIndex, buffer, priority, len);
+	else
+		free(buffer);
+
 	sendIndex++;
     sendNum += sendLen;
 
