@@ -36,7 +36,7 @@
 
 #define local_port 6788
 #define server_port 61000
-#define server_ip "192.168.1.109"
+#define server_ip "23.89.232.109"
 
 #define BACKLOG 	10
 /*#define BLOWFISH_DEBUG*/
@@ -558,66 +558,17 @@ int send_audio_data(u8 *audio_buf, u32 data_len,struct timeval t1)
   //      printf("   Audio Cost Time is %d\n",audio_data->time_stamp - pre_time_stamp);
    // }
     pre_time_stamp = audio_data->time_stamp;
-	p = (char *)av_command2;
+//	p = (char *)av_command2;
     //printf("audio_data time_stamp is %lu\n",audio_data->time_stamp);
 
     audio_num++;
 	pthread_mutex_lock(&AVsocket_mutex);
 
-	while( total_send_len < 40 )
-	{
-        /*gettimeofday(&t1,NULL);*/
-		send_len = JEAN_send_master((void *)&p[total_send_len], 40-total_send_len, 4, 0, 0);
-		/*gettimeofday(&t2,NULL);*/
-		if (send_len <= 0) {
-			perror("#send_audio_header");
-			if( errno != EAGAIN || retry_num >= MAX_RETRY_NUM )
-			{
-				goto err_exit;
-			}
-			else
-			{
-				retry_num++;
-				usleep(500000);
-			}
-		}
-		else
-		{
-			total_send_len += send_len;
-			if (total_send_len < 40)
-			{
-				printf("#opcode audio header short send(%d/40)!\n",total_send_len);
-			}
-			retry_num = 0;
-		}
-	}
-	total_send_len = 0;
-	p = audio_buf;
-	while( total_send_len < length )
-	{
-		send_len = JEAN_send_master((void *)&p[total_send_len], length-total_send_len, 4, 0, 0);
-		if (send_len <= 0) {
-			perror("#send_audio");
-			if( errno != EAGAIN || retry_num >= MAX_RETRY_NUM )
-			{
-				goto err_exit;
-			}
-			else
-			{
-				retry_num++;
-				usleep(500000);
-			}
-		}
-		else
-		{
-			total_send_len += send_len;
-			if (total_send_len < length)
-			{
-				printf("#audio short send(%d/%d)!\n",total_send_len,length);
-			}
-			retry_num = 0;
-		}
-	}
+	p = (char *)malloc(sizeof(struct command) + data_len + 20);
+	memcpy(p, (char *)av_command2, sizeof(struct command) + 20);
+	memcpy(p + sizeof(struct command) + 20, audio_buf, data_len);
+	send_len = JEAN_send_master(p, sizeof(struct command) + data_len + 20, 0, 0, 0);
+	free(p);
 
 	pthread_mutex_unlock(&AVsocket_mutex);
 
