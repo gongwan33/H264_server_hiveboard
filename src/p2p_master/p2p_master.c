@@ -23,6 +23,7 @@
 #define SEND_BUFF_SIZE 1024*3
 #define MAX_RECEIVE 1024*1024
 #define MAX_RECV_BUF 1024*1024*10
+#define MTU 1000
 
 #define server_ip_1 "192.168.1.109"
 //#define server_ip_1 "23.89.232.109"
@@ -34,6 +35,7 @@
 #define server_port 61000
 #define server_turn_port 61001
 #define server_cmd_port 61002
+#define server_control_port 61003
 #define local_port 6888
 
 static char recvSign;
@@ -43,11 +45,13 @@ static struct ifconf ifc;
 static char ip_info[50];
 static int sockfd;
 static int cmdfd;
+static int controlfd;
 static int port, sin_size, recv_sin_len;
 static char mac[6], ip[4], buff[1024];
 static pthread_t keep_connection;
 static char pole_res;
 static unsigned int sendIndex;
+static unsigned int sliceIndex;
 static unsigned int getNum;
 static unsigned int sendNum;
 static char* recvBuf;
@@ -213,6 +217,22 @@ int Send_TURN(){
 int Send_CMDOPEN(){
 	char Sen_W;
 	Sen_W = CMD_CHAN;
+	char id = 'M';
+	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) return -1;
+
+	ip_info[0] = Sen_W;
+	memcpy(ip_info + 1, USERNAME, 10);
+	memcpy(ip_info + 12, PASSWD, 10);
+	ip_info[23] = id;
+	memcpy(ip_info + 34, &host_sin, sizeof(struct sockaddr_in));
+
+	sendto(sockfd, ip_info, sizeof(ip_info), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
+	return 0;
+}
+
+int Send_CONTROLOPEN(){
+	char Sen_W;
+	Sen_W = CONTROL_CHAN;
 	char id = 'M';
 	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) return -1;
 
@@ -427,6 +447,69 @@ int recv_cmd(char *data, int len)
 	}
 
 	return recvLen;
+}
+
+int init_CONTROL_CHAN()
+{
+	struct sockaddr_in pin;
+
+	bzero(&pin,sizeof(pin));
+	pin.sin_family = AF_INET;
+	pin.sin_addr.s_addr = inet_addr(server_ip_1);
+	pin.sin_port = htons(server_control_port);
+
+	if((controlfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		printf("control:Error opening socket \n");
+		return -1;
+	}
+
+	if(connect(controlfd, (void *)&pin, sizeof(pin)) == -1)
+	{
+		printf("control:Error connecting to socket \n");
+		return -1;
+	}
+
+	return 0;
+}
+
+int close_CONTROL_CHAN()
+{
+	close(controlfd);
+}
+
+int send_control(char *data, int len)
+{
+	int sendLen = 0;
+	if(len < 0)
+		return -1;
+	sendLen = send(controlfd, data, len, 0);
+	if(sendLen == -1)
+	{
+		printf("control:Error in send\n");
+		return -1;
+	}
+
+	return sendLen;
+}
+
+int recv_control(char *data, int len)
+{
+	int recvLen = 0;
+	recvLen = recv(controlfd, data, len, 0);
+	if(recvLen == -1)
+	{
+		printf("control:Error in recv\n");
+		return -1;
+	}
+
+	return recvLen;
+}
+
+void* controlChanThread(void *argc)
+{
+
+
 }
 
 int findIndexInBuf(char *buf, int *start, int *end, int *datLen, u_int32_t index)
@@ -895,6 +978,18 @@ int JEAN_init_master(int serverPort, int localPort, char *setIp)
 					sleep(1);
 				}
 
+				clean_rec_buff();
+				for(i = 0; i < MAX_TRY + 1 ; i++){
+					printf("require cmd channel open \n");
+					Send_CONTROLOPEN();
+					char result = 0;
+
+					recvfrom(sockfd, Ctl_Rec, sizeof(Ctl_Rec), 0, (struct sockaddr *)&recv_sin, &recv_sin_len);
+					if(Ctl_Rec[0] == GET_REQ) 
+						break;
+					sleep(1);
+				}
+
 				if(i >= MAX_TRY + 1) return OUT_TRY;
 
 				if(recvThreadRunning == 0)
@@ -934,6 +1029,7 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
     char *buffer;
 	struct load_head lHead;
 	NALU_t nalu;
+	int tSendLen = 0;
 
 	if(video_analyse >= 1)
 	{
@@ -947,7 +1043,7 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 			case NALU_TYPE_DPA:
 			case NALU_TYPE_DPB:
 			case NALU_TYPE_DPC:
-				priority = 0;
+				priority = 2;
 				break;
 			case NALU_TYPE_SEI:
 			case NALU_TYPE_PPS:
@@ -959,54 +1055,77 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		}
 	}
 
-	buffer = (char *)malloc(len + sizeof(struct load_head));
-	memcpy(lHead.logo, "JEAN", 4);
-	lHead.index = sendIndex;
-	lHead.get_number = getNum;
-	lHead.priority = priority;
-	lHead.length = len;
-	lHead.direction = 1;
+	int sP = 0;
+	int curLen = 0;
+	int count = 0;
+	int total = len/MTU + ((len%MTU == 0)? 0 : 1);
+	while(sP < len)
+	{
+		if(sP + MTU <= len)
+			curLen = MTU;
+		else
+			curLen = len - sP;
 
-	memcpy(buffer, &lHead, sizeof(lHead));
-	memcpy(buffer + sizeof(lHead), data, len);
+		buffer = (char *)malloc(curLen + sizeof(struct load_head));
+		memcpy(lHead.logo, "JEAN", 4);
+		lHead.index = sendIndex;
+		lHead.get_number = getNum;
+		lHead.priority = priority;
+		lHead.length = curLen;
+		lHead.direction = 1;
+		lHead.address = sP;
+		lHead.subIndex = count;
+		lHead.totalIndex = total;
+		lHead.sliceIndex = sliceIndex;
+
+		memcpy(buffer, &lHead, sizeof(lHead));
+		memcpy(buffer + sizeof(lHead), data + sP, curLen);
 
 #if TEST_LOST
-	int rnd = 0;
-	int lost_emt = LOST_PERCENT;
-	rnd = rand()%100;
+		int rnd = 0;
+		int lost_emt = LOST_PERCENT;
+		rnd = rand()%100;
 #ifdef LOST_PRINT
-	if(rnd <= lost_emt)
-	    printf("Lost!!: rnd = %d, lost_emt = %d, lost_posibility = %d percent\n", rnd, lost_emt, lost_emt);
+		if(rnd <= lost_emt)
+			printf("Lost!!: rnd = %d, lost_emt = %d, lost_posibility = %d percent\n", rnd, lost_emt, lost_emt);
 #endif
-	if(rnd > lost_emt)
-	{
+		if(rnd > lost_emt)
+		{
 #endif
 
-    if(connectionStatus == P2P)
-	{
-	    sendLen = sendto(sockfd, buffer, len + sizeof(lHead), 0, (struct sockaddr *)&slave_sin, sizeof(struct sockaddr_in));
-	}
-	else if(connectionStatus == TURN)
-	{
-	    sendLen = sendto(sockfd, buffer, len + sizeof(lHead), 0, (struct sockaddr *)&turnaddr, sizeof(turnaddr));
-	}
-	else 
-	{
-		return NO_CONNECTION; 
-	}
+			if(connectionStatus == P2P)
+			{
+				sendLen = sendto(sockfd, buffer, curLen + sizeof(lHead), 0, (struct sockaddr *)&slave_sin, sizeof(struct sockaddr_in));
+			}
+			else if(connectionStatus == TURN)
+			{
+				sendLen = sendto(sockfd, buffer, curLen + sizeof(lHead), 0, (struct sockaddr *)&turnaddr, sizeof(turnaddr));
+			}
+			else 
+			{
+				return NO_CONNECTION; 
+			}
 
 #if TEST_LOST
-	}
+		}
 #endif
 
-	if(priority > 0)
-		reg_buff(sendIndex, buffer, priority, len);
-	else
-		free(buffer);
+		if(priority > 0)
+			reg_buff(sendIndex, buffer, priority, curLen);
+		else
+			free(buffer);
 
-	sendIndex++;
-    sendNum += sendLen;
-    return sendLen;
+		count++;
+		tSendLen += sendLen;
+		sendIndex++;
+		
+		sP += MTU;
+	}
+
+	sliceIndex++;
+	sendNum += tSendLen;
+
+	return tSendLen;
 }
 
 int JEAN_recv_master(char *data, int len, unsigned char priority, unsigned char video_analyse)
