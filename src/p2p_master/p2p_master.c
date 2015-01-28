@@ -19,16 +19,13 @@
 #include <p2p/DSet.h>
 #include <slice_analyse.h>
 
-#define MAX_TRY 10
+#define MAX_TRY 5
 #define SEND_BUFF_SIZE 1024*3
 #define MAX_RECEIVE 1024*1024
 #define MAX_RECV_BUF 1024*1024*10
 
-//#define server_ip_1 "192.168.1.216"
-//#define server_ip_1 "192.168.1.114"
 #define server_ip_1 "192.168.1.109"
-//#define server_ip_1 "192.168.1.4"
-//#define server_ip_1 "58.214.236.114"
+//#define server_ip_1 "23.89.232.109"
 
 #define USERNAME "wang"
 #define PASSWD "123456"
@@ -277,9 +274,10 @@ void sendGet(unsigned int index)
 	int rnd = 0;
 	int lost_emt = LOST_PERCENT;
 	rnd = rand()%100;
+#ifdef LOST_PRINT
 	if(rnd <= lost_emt)
 	    printf("Lost!!: rnd = %d, lost_emt = %d, lost_posibility = %d percent\n", rnd, lost_emt, lost_emt);
-
+#endif
 	if(rnd > lost_emt)
 	{
 #endif
@@ -310,9 +308,10 @@ void sendRetry(unsigned int index)
 	int rnd = 0;
 	int lost_emt = LOST_PERCENT;
 	rnd = rand()%100;
+#ifdef LOST_PRINT
 	if(rnd <= lost_emt)
 	    printf("Lost!!: rnd = %d, lost_emt = %d, lost_posibility = %d percent\n", rnd, lost_emt, lost_emt);
-
+#endif
 	if(rnd > lost_emt)
 	{
 #endif
@@ -351,9 +350,10 @@ void resend(char *data, int len, u_int32_t index)
 	int rnd = 0;
 	int lost_emt = LOST_PERCENT;
 	rnd = rand()%100;
+#ifdef LOST_PRINT
 	if(rnd <= lost_emt)
 	    printf("Lost!!: rnd = %d, lost_emt = %d, lost_posibility = %d percent\n", rnd, lost_emt, lost_emt);
-
+#endif
 	if(rnd > lost_emt)
 	{
 #endif
@@ -584,10 +584,11 @@ void* recvData(void *argc)
 #endif
                         int i = 0;
 						pauseSign = 1;
-						for(i = 1;i < lostNum; i++)
-						{
-							sendRetry(lastIndex + i);
-						}
+//						for(i = 1;i < lostNum; i++)
+//						{
+//							sendRetry(lastIndex + i);
+							sendRetry(lastIndex + 1);
+//						}
 
 						if(recvProcessBackBufP + recvProcessBufP - scanP < MAX_RECV_BUF)
 						{
@@ -973,9 +974,10 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 	int rnd = 0;
 	int lost_emt = LOST_PERCENT;
 	rnd = rand()%100;
+#ifdef LOST_PRINT
 	if(rnd <= lost_emt)
 	    printf("Lost!!: rnd = %d, lost_emt = %d, lost_posibility = %d percent\n", rnd, lost_emt, lost_emt);
-
+#endif
 	if(rnd > lost_emt)
 	{
 #endif
@@ -1004,7 +1006,6 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 
 	sendIndex++;
     sendNum += sendLen;
-
     return sendLen;
 }
 

@@ -2,8 +2,8 @@
 #define RING_H
 
 #define TRY_MAX_TIMES 100
-#define TIMEOUT_ELM 500000
-#define RING_LEN 32
+#define TIMEOUT_ELM 20000000
+#define RING_LEN 64
 
 #include <stdio.h>
 #include <stdlib.h>
