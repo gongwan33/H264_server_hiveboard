@@ -3,7 +3,7 @@
 
 #define TRY_MAX_TIMES 100
 #define TIMEOUT_ELM 20000000
-#define RING_LEN 32
+#define RING_LEN 40
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,7 +79,6 @@ void* checkRing(void *argc)
 
 		for(i = 0; i < RING_LEN; i++)
 		{
-			usleep(10000);
 			if(empty_list[i] != -1)
 			{
 #if TEST_LOST
@@ -100,7 +99,6 @@ void* checkRing(void *argc)
 						if(connectionStatus == P2P)
 						{
 							pthread_mutex_lock(&buf_lock);
-							printf("send %d\n", buf_list[i].index);
 							sendLen = sendto(sockfd, buf_list[i].pointer, buf_list[i].length, 0, (struct sockaddr *)&slave_sin, sizeof(struct sockaddr_in));
 							pthread_mutex_unlock(&buf_lock);
 						}
@@ -144,14 +142,16 @@ void* checkRing(void *argc)
 						if(!(seqCount%RING_LEN))
 						{
 							sendSyn();
+#if PRINT
 							printf("send Sync %d\n", seqCount);
+#endif
 						}
 						pthread_mutex_unlock(&buf_lock);
 					}
 				}
 
 				gettimeofday(&cur_tv, NULL);
-				if(cur_tv.tv_sec*1000000 + cur_tv.tv_usec - buf_list[i].tv.tv_sec*1000000 - buf_list[i].tv.tv_usec > resendDelay && buf_list[i].status == SEND)
+				if(cur_tv.tv_sec*1000000 + cur_tv.tv_usec - buf_list[i].tv.tv_sec*1000000 - buf_list[i].tv.tv_usec > resendDelay && buf_list[i].status == SEND && buf_list[i].priority > 0)
 				{
 					pthread_mutex_lock(&buf_lock);
 					buf_list[i].status = RESEND;
@@ -177,7 +177,7 @@ void initRing()
 	{
 		checkRingRunning = 1;
 		checkRingSign = 1;
-//		pthread_create(&checkRing_t, NULL, checkRing, NULL);
+		pthread_create(&checkRing_t, NULL, checkRing, NULL);
 	}
 }
 
@@ -257,7 +257,7 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
 	pthread_mutex_lock(&buf_lock);
     buf_list[pos].index = index;
     buf_list[pos].pointer = pointer;
-    buf_list[pos].priority = (priority + 1) * 2;
+    buf_list[pos].priority = priority;
 	buf_list[pos].length = len;
 	buf_list[pos].status = READY;
     gettimeofday(&(buf_list[pos].tv), NULL);
@@ -279,7 +279,6 @@ int unreg_buff(unsigned int index)
 	pthread_mutex_lock(&buf_lock);
 	if(empty_list[pos] != -1)
 	{
-		printf("pos: %d\n", pos);
 		free(buf_list[pos].pointer);
 	}
     empty_list[pos] = -1;
@@ -287,7 +286,9 @@ int unreg_buff(unsigned int index)
 	if(!(seqCount%RING_LEN))
 	{
 		sendSyn();
+#if PRINT
 		printf("send Sync %d\n", seqCount);
+#endif
 	}
 
 	pthread_mutex_unlock(&buf_lock);

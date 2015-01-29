@@ -443,13 +443,12 @@ void* controlChanThread(void *argc)
 	controlChanThreadRunning = 1;
 
 	int recvLen = 0;
-	char controlBuf[CONTROL_BUF_SIZE];
+	unsigned char controlBuf[CONTROL_BUF_SIZE];
 	int controlBufP = 0;
 
 	while(controlSign == 1)
 	{
 		recvLen = recv_control(controlBuf, CONTROL_BUF_SIZE); 
-		printf("p %d recvLen %d\n", controlBufP, recvLen);
 		if(recvLen <= 0)
 			continue;
 		else
@@ -469,13 +468,11 @@ void* controlChanThread(void *argc)
 					if(controlBufP - scanP - sizeof(struct get_head) >= sizeof(u_int32_t))
 					{
 						unsigned int index = 0;
-						index = (controlBuf[scanP + 3]) | (controlBuf[scanP + 4]<<8) | (controlBuf[scanP + 5]<<16) | (controlBuf[scanP + 6]<<24);
-						pthread_mutex_lock(&ring_lock);
+						index = (controlBuf[scanP + 3]) | ((controlBuf[scanP + 4]<<8) & 0xff00) | ((controlBuf[scanP + 5]<<16) & 0xff0000) | ((controlBuf[scanP + 6]<<24) & 0xff000000);
 						unreg_buff(index);
-						pthread_mutex_unlock(&ring_lock);
 						scanP = scanP + sizeof(struct get_head) + sizeof(u_int32_t);
 #if PRINT
-						printf("get %d\n", index);
+//						printf("get %d\n", index);
 #endif
 					}
 					else 
@@ -519,7 +516,6 @@ void* controlChanThread(void *argc)
 		}
 
 	}
-printf("control out\n");
 	controlChanThreadRunning = 0;
 }
 
@@ -990,18 +986,18 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		switch(nalu.nal_unit_type)
 		{
 			case NALU_TYPE_IDR:
-				priority = 8;
+				priority = 3;
 				break;
 			case NALU_TYPE_SLICE:
 			case NALU_TYPE_DPA:
 			case NALU_TYPE_DPB:
 			case NALU_TYPE_DPC:
-				priority = 2;
+				priority = 1;
 				break;
 			case NALU_TYPE_SEI:
 			case NALU_TYPE_PPS:
 			case NALU_TYPE_SPS:
-				priority = 8;
+				priority = 3;
 				break;
 			default:
 				priority = 0;
@@ -1035,9 +1031,7 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		memcpy(buffer + sizeof(lHead), data + sP, curLen);
 
 		sendLen = curLen + sizeof(lHead);
-		pthread_mutex_lock(&ring_lock);
 		reg_buff(sendIndex, buffer, priority, curLen + sizeof(lHead));
-		pthread_mutex_unlock(&ring_lock);
 
 		count++;
 		tSendLen += sendLen;
