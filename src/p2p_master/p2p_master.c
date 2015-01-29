@@ -472,7 +472,7 @@ void* controlChanThread(void *argc)
 						unreg_buff(index);
 						scanP = scanP + sizeof(struct get_head) + sizeof(u_int32_t);
 #if PRINT
-//						printf("get %d\n", index);
+						printf("get %d\n", index);
 #endif
 					}
 					else 

@@ -3,8 +3,8 @@
  *FUNCTION:DEBUG SETTINGS
  */
 
-#define PRINT 0
+#define PRINT 1
 //#define TEST_LOST 1 
-#define LOST_PERCENT 10
+#define LOST_PERCENT 5
 //#define LOST_PRINT
-//#define TEST_TURN
+#define TEST_TURN

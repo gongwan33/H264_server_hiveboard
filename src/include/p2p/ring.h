@@ -1,9 +1,10 @@
 #ifndef RING_H
 #define RING_H
 
-#define TRY_MAX_TIMES 100
-#define TIMEOUT_ELM 20000000
 #define RING_LEN 40
+#define RING_WAIT_TIMEOUT 30 //seconds
+#define RTT_A 7/8
+#define RTT_B 2
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +14,7 @@
 #include <sys/time.h>
 #include <signal.h>  
 #include <p2p/JEANP2PPRO.h>
+#include <p2p/DSet.h>
 
 #define READY 0x00
 #define SEND  0x01
@@ -25,6 +27,9 @@ void emptyRing();
 void printRingStatus();
 char *getPointerByIndex(unsigned int index, int *len, int *Prio);
 
+unsigned long lastRegTime = 0;
+int rto = 50000;
+unsigned long rtt = 0;
 
 struct buf_node
 {
@@ -69,18 +74,19 @@ void printRingStatus()
 void* checkRing(void *argc)
 {
 	checkRingRunning = 1;
-	int resendDelay = 5000;
 
 	pthread_detach(pthread_self());
 
 	while(checkRingSign == 1)
 	{
 		int i = 0;
+		int resendDelay = rto;
 
 		for(i = 0; i < RING_LEN; i++)
 		{
 			if(empty_list[i] != -1)
 			{
+				int sendLen = 0;
 #if TEST_LOST
 				int rnd = 0;
 				int lost_emt = LOST_PERCENT;
@@ -92,10 +98,13 @@ void* checkRing(void *argc)
 				if(rnd > lost_emt)
 				{
 #endif
-					//printf("seqIndex %d index %d %d page %d status %d\n", seqIndex, buf_list[i].index/RING_LEN, buf_list[i].index, page, buf_list[i].status);
-					if(seqIndex >= 0 && buf_list[i].index/RING_LEN == page && buf_list[i].status != SEND)
+					if(seqIndex >= 0 && buf_list[i].index/RING_LEN == page && buf_list[i].status != SEND && buf_list[i].pointer != NULL)
 					{
-						int sendLen = 0;
+						sendLen = 0;
+						struct load_head head;
+
+						*(buf_list[i].pointer + ((void *)&(head.priority) - (void *)&head)) = buf_list[i].priority;
+						gettimeofday(&(buf_list[i].tv), NULL);
 						if(connectionStatus == P2P)
 						{
 							pthread_mutex_lock(&buf_lock);
@@ -113,9 +122,6 @@ void* checkRing(void *argc)
 							return; 
 						}
 
-						if(sendLen > 0)
-							usleep(100000/sendLen);
-
 						if(sendLen >= buf_list[i].length)
 						{
 							pthread_mutex_lock(&buf_lock);
@@ -128,6 +134,11 @@ void* checkRing(void *argc)
 				}
 #endif
 
+				if(sendLen > 0)
+					usleep(80000/sendLen);
+				else
+					usleep(20);
+
 				struct timeval cur_tv;
 
 				gettimeofday(&cur_tv, NULL);
@@ -136,16 +147,22 @@ void* checkRing(void *argc)
 					if(empty_list[i] != -1)
 					{
 						pthread_mutex_lock(&buf_lock);
-						empty_list[i] = -1;
-						free(buf_list[i].pointer);
-						seqCount++;	
-						if(!(seqCount%RING_LEN))
+						if(empty_list[i] != -1 && buf_list[i].pointer != NULL)
 						{
-							sendSyn();
+							free(buf_list[i].pointer);
+							buf_list[i].pointer = NULL;
+
+							seqCount++;	
+							if(!(seqCount%RING_LEN))
+							{
+								sendSyn();
 #if PRINT
-							printf("send Sync %d\n", seqCount);
+								printf("send Sync %d\n", seqCount);
 #endif
+							}
+
 						}
+						empty_list[i] = -1;
 						pthread_mutex_unlock(&buf_lock);
 					}
 				}
@@ -159,6 +176,8 @@ void* checkRing(void *argc)
 				}
 
 			}
+			else
+				usleep(30);
 		}
 	}
 
@@ -243,16 +262,26 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
 {
 	int times = 0;
     int pos = 0;
+	struct timeval regtv;
+
+	gettimeofday(&regtv, NULL);
 
 	pos = getEmpPos();
-	while(pos == -1 /*&& times < TRY_MAX_TIMES*/)
+	while(pos == -1 && regtv.tv_sec - lastRegTime < RING_WAIT_TIMEOUT)
 	{
+		gettimeofday(&regtv, NULL);
 		pos = getEmpPos();
 		usleep(1000);
 		times++;
 	}
 
-	pos = getEmpPos();
+	if(regtv.tv_sec - lastRegTime >= RING_WAIT_TIMEOUT && lastRegTime != 0)
+	{
+		printf("block error happened\n");
+		exit(0);
+	}
+
+	lastRegTime = regtv.tv_sec;
 
 	pthread_mutex_lock(&buf_lock);
     buf_list[pos].index = index;
@@ -260,7 +289,6 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
     buf_list[pos].priority = priority;
 	buf_list[pos].length = len;
 	buf_list[pos].status = READY;
-    gettimeofday(&(buf_list[pos].tv), NULL);
     empty_list[pos] = 1;
 	pthread_mutex_unlock(&buf_lock);
 	seqIndex++;
@@ -270,26 +298,36 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
 int unreg_buff(unsigned int index)
 {
 	int pos = 0;
+	struct timeval gettv;
 
 	pos = getIndexPos(index);
 
 	if(pos == -1)
 		return -1;
 
+	gettimeofday(&gettv, NULL);
+	unsigned long new_rtt = ((gettv.tv_sec - buf_list[pos].tv.tv_sec)*1000000 + (gettv.tv_usec - buf_list[pos].tv.tv_usec));
+	rtt = rtt*RTT_A + new_rtt - new_rtt*RTT_A;
+	rto = rtt*RTT_B;
+	printf("time : %d %d\n", rtt, rto);
+
 	pthread_mutex_lock(&buf_lock);
-	if(empty_list[pos] != -1)
+
+	if(empty_list[pos] != -1 && buf_list[pos].pointer != NULL)
 	{
 		free(buf_list[pos].pointer);
-	}
-    empty_list[pos] = -1;
-	seqCount++;	
-	if(!(seqCount%RING_LEN))
-	{
-		sendSyn();
+		buf_list[pos].pointer = NULL;
+		seqCount++;	
+		if(!(seqCount%RING_LEN))
+		{
+			sendSyn();
 #if PRINT
-		printf("send Sync %d\n", seqCount);
+			printf("send Sync %d\n", seqCount);
 #endif
+		}
 	}
+	empty_list[pos] = -1;
+
 
 	pthread_mutex_unlock(&buf_lock);
 	return 0;
