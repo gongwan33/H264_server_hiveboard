@@ -300,8 +300,8 @@ void clean_rec_buff(){
 void sendGet(unsigned int index)
 {
 	struct get_head getSt;
-	char * buf;
-	char num[4];
+	unsigned char * buf;
+	unsigned char num[4];
 	memcpy(&getSt, "GET", 3);
 	buf = (char *)malloc(sizeof(struct get_head) + sizeof(u_int32_t));
 	memcpy(buf, &getSt, sizeof(getSt));
