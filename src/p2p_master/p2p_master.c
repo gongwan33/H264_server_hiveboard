@@ -65,6 +65,7 @@ static unsigned int recvBufP;
 static unsigned int recvProcessBufP;
 static unsigned int recvProcessBackBufP;
 static char recvThreadRunning = 0;
+static char waitResend = 0;
 
 int JEAN_recv_timeout = 1000;//1s
 int commonKey = 0;
@@ -478,9 +479,6 @@ void* controlChanThread(void *argc)
 	while(controlSign == 1)
 	{
 		recvLen = recv_control(controlBuf, CONTROL_BUF_SIZE); 
-#if PRINT
-		printf("control channel recv %d\n", recvLen);
-#endif
 		if(recvLen <= 0)
 			continue;
 		else
@@ -497,18 +495,16 @@ void* controlChanThread(void *argc)
 			{
 				if(controlBuf[scanP] == 'G' && controlBuf[scanP + 1] == 'E' && controlBuf[scanP + 2] == 'T')
 				{
-#if PRINT
-					printf("get\n");
-#endif
 					memcpy(&get, controlBuf + scanP, sizeof(struct get_head));
 					unreg_buff(get.index);
 					scanP = scanP + sizeof(struct get_head);
+#if PRINT
+					printf("get %d\n", get.index);
+#endif
 				}
 				else if(controlBuf[scanP] == 'R' && controlBuf[scanP + 1] == 'T' && controlBuf[scanP + 2] == 'Y')
 				{
-#if PRINT
-						printf("resend pack!!\n");
-#endif
+					waitResend = 1;
 
 					int rLen = 0;
 					int rPrio = 0;
@@ -523,6 +519,12 @@ void* controlChanThread(void *argc)
 						resend(retryData, 0, retry.index);
 					}
 					scanP = scanP + sizeof(struct retry_head);
+
+#if PRINT
+						printf("resend pack %d!!\n", retry.index);
+#endif
+
+					waitResend = 0;
 				}
 
 				else
@@ -1062,6 +1064,8 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		if(rnd > lost_emt)
 		{
 #endif
+			while(waitResend == 1)
+				usleep(100);
 
 			if(connectionStatus == P2P)
 			{
