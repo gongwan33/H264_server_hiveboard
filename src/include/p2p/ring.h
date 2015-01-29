@@ -1,7 +1,7 @@
 #ifndef RING_H
 #define RING_H
 
-#define RING_LEN 40
+#define RING_LEN 32
 #define RING_WAIT_TIMEOUT 30 //seconds
 #define RTT_A 7/8
 #define RTT_B 2
@@ -309,7 +309,6 @@ int unreg_buff(unsigned int index)
 	unsigned long new_rtt = ((gettv.tv_sec - buf_list[pos].tv.tv_sec)*1000000 + (gettv.tv_usec - buf_list[pos].tv.tv_usec));
 	rtt = rtt*RTT_A + new_rtt - new_rtt*RTT_A;
 	rto = rtt*RTT_B;
-	printf("time : %d %d\n", rtt, rto);
 
 	pthread_mutex_lock(&buf_lock);
 

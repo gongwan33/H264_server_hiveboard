@@ -1008,18 +1008,24 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 	int curLen = 0;
 	int count = 0;
 	int total = len/MTU + ((len%MTU == 0)? 0 : 1);
+	int macroParam = 0;
 	while(sP < len)
 	{
 		if(sP + MTU <= len)
 			curLen = MTU;
 		else
 			curLen = len - sP;
+		
+		if(count * 100/total > 50)
+			macroParam = 2;
+		else
+			macroParam = 0;
 
 		buffer = (char *)malloc(curLen + sizeof(struct load_head));
 		memcpy(lHead.logo, "JEAN", 4);
 		lHead.index = sendIndex;
 		lHead.get_number = getNum;
-		lHead.priority = priority;
+		lHead.priority = priority + macroParam;
 		lHead.length = curLen;
 		lHead.direction = 1;
 		lHead.address = sP;
