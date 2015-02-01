@@ -135,9 +135,9 @@ void* checkRing(void *argc)
 #endif
 
 				if(sendLen > 0)
-					usleep(80000/sendLen);
+					usleep(10000/sendLen);
 				else
-					usleep(20);
+					usleep(10);
 
 				struct timeval cur_tv;
 
@@ -176,8 +176,8 @@ void* checkRing(void *argc)
 				}
 
 			}
-			else
-				usleep(30);
+//			else
+//				usleep(10);
 		}
 	}
 
@@ -271,7 +271,7 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
 	{
 		gettimeofday(&regtv, NULL);
 		pos = getEmpPos();
-		usleep(1000);
+		usleep(10);
 		times++;
 	}
 

@@ -64,6 +64,7 @@ static pthread_t recvDat_id = 0;
 static pthread_mutex_t recvBuf_lock;
 static pthread_mutex_t synGetCount_lock;
 static pthread_mutex_t ring_lock;
+static pthread_mutex_t send_lock;
 static unsigned int recvBufP;
 static unsigned int recvProcessBufP;
 static unsigned int recvProcessBackBufP;
@@ -775,6 +776,12 @@ int JEAN_init_master(int serverPort, int localPort, char *setIp)
 		return -1;
 	}
 
+    if (pthread_mutex_init(&send_lock, NULL) != 0) 
+	{
+		printf("mutex init error\n");
+		return -1;
+	}
+
 	ret = local_net_init(localPort);
 	if(ret < 0){
 		printf("Local bind failed!!%d\n", ret);
@@ -986,7 +993,7 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		switch(nalu.nal_unit_type)
 		{
 			case NALU_TYPE_IDR:
-				priority = 3;
+				priority = 7;
 				break;
 			case NALU_TYPE_SLICE:
 			case NALU_TYPE_DPA:
@@ -997,18 +1004,19 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 			case NALU_TYPE_SEI:
 			case NALU_TYPE_PPS:
 			case NALU_TYPE_SPS:
-				priority = 3;
+				priority = 7;
 				break;
 			default:
 				priority = 0;
 		}
 	}
-
+	
 	int sP = 0;
 	int curLen = 0;
 	int count = 0;
 	int total = len/MTU + ((len%MTU == 0)? 0 : 1);
 	int macroParam = 0;
+	pthread_mutex_lock(&send_lock);
 	while(sP < len)
 	{
 		if(sP + MTU <= len)
@@ -1016,8 +1024,10 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		else
 			curLen = len - sP;
 		
-		if(count * 100/total > 50)
-			macroParam = 2;
+		if(count * 100/total > 30)
+			macroParam = 3;
+		else if(count * 100/total > 50)
+			macroParam = 1;
 		else
 			macroParam = 0;
 
@@ -1025,7 +1035,7 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		memcpy(lHead.logo, "JEAN", 4);
 		lHead.index = sendIndex;
 		lHead.get_number = getNum;
-		lHead.priority = priority + macroParam;
+		lHead.priority = (priority + macroParam)/2;
 		lHead.length = curLen;
 		lHead.direction = 1;
 		lHead.address = sP;
@@ -1045,10 +1055,10 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		
 		sP += MTU;
 	}
-
 	sliceIndex++;
-	sendNum += tSendLen;
+	pthread_mutex_unlock(&send_lock);
 
+	sendNum += tSendLen;
 	return tSendLen;
 }
 
@@ -1113,6 +1123,7 @@ int JEAN_close_master()
 	pthread_mutex_destroy(&recvBuf_lock);
 	pthread_mutex_destroy(&synGetCount_lock);
 	pthread_mutex_destroy(&ring_lock);
+	pthread_mutex_destroy(&send_lock);
 	close_CONTROL_CHAN();
 	close_CMD_CHAN();
 	free(recvBuf);
