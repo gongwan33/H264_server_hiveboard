@@ -71,6 +71,7 @@ static unsigned int recvProcessBufP;
 static unsigned int recvProcessBackBufP;
 static char recvThreadRunning = 0;
 static int synGetCount = 0;
+static unsigned char windowLen = 0;
 
 int JEAN_recv_timeout = 1000;//1s
 int commonKey = 0;
@@ -316,6 +317,21 @@ void sendGet(unsigned int index)
 	memcpy(buf + sizeof(getSt), num, 4);
 	
 	send_control(buf, sizeof(struct get_head) + sizeof(u_int32_t));
+	free(buf);
+}
+
+void sendWin(unsigned char winLen)
+{
+	struct win_head winSt;
+	unsigned char * buf;
+	memcpy(&winSt, "WIN", 3);
+	buf = (char *)malloc(sizeof(struct win_head) + sizeof(unsigned char));
+	memcpy(buf, &winSt, sizeof(struct win_head));
+	buf[3] = winLen;
+	
+	send_control(buf, sizeof(struct win_head) + sizeof(unsigned char));
+	printf("send win %d\n", buf[3]);
+	free(buf);
 }
 
 void sendSyn()
@@ -467,7 +483,7 @@ void* controlChanThread(void *argc)
 			{
 				if(controlBuf[scanP] == 'G' && controlBuf[scanP + 1] == 'E' && controlBuf[scanP + 2] == 'T')
 				{
-					memcpy(&get, controlBuf + scanP, sizeof(struct get_head));
+//					memcpy(&get, controlBuf + scanP, sizeof(struct get_head));
 					
 					if(controlBufP - scanP - sizeof(struct get_head) >= sizeof(u_int32_t))
 					{
@@ -502,6 +518,22 @@ void* controlChanThread(void *argc)
 					page++;
 					scanP = scanP + sizeof(struct sok_head);
 				}
+				else if(controlBuf[scanP] == 'W' && controlBuf[scanP + 1] == 'I' && controlBuf[scanP + 2] == 'N')
+				{
+					
+					if(controlBufP - scanP - sizeof(struct win_head) >= sizeof(unsigned char))
+					{
+						windowLen = controlBuf[scanP + 3];
+
+						scanP = scanP + sizeof(struct get_head) + sizeof(unsigned char);
+#if PRINT
+						printf("win %d\n", windowLen);
+#endif
+					}
+					else 
+						break;
+				}
+
 				else
 					scanP++;
 			}
@@ -918,7 +950,6 @@ int JEAN_init_master(int serverPort, int localPort, char *setIp)
 					sleep(1);
 				}
 
-				initRing();	
 
 				clean_rec_buff();
 				for(i = 0; i < MAX_TRY + 1 ; i++){
@@ -954,6 +985,7 @@ int JEAN_init_master(int serverPort, int localPort, char *setIp)
 					pthread_create(&recvDat_id, NULL, recvData, NULL);
 				}
 
+				initRing();	
 				break;
 
 			case M_POL_REQ:

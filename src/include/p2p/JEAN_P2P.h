@@ -14,5 +14,6 @@ int close_CMD_CHAN();
 int send_cmd(char *data, int len);
 int recv_cmd(char *data, int len);
 void sendSyn();
+void sendWin(unsigned char winlen);
 
 #endif

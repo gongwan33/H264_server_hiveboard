@@ -184,6 +184,8 @@ void initRing()
 	memset(empty_list, -1, RING_LEN);
 	memset(buf_list, -1, RING_LEN);
 
+	sendWin(RING_LEN);
+
 	if(checkRingRunning == 0)
 	{
 		checkRingRunning = 1;
