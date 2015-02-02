@@ -444,6 +444,8 @@ void* controlChanThread(void *argc)
 {
 	controlChanThreadRunning = 1;
 
+	pthread_detach(pthread_self());
+
 	int recvLen = 0;
 	unsigned char controlBuf[CONTROL_BUF_SIZE];
 	int controlBufP = 0;
