@@ -133,7 +133,7 @@ void* checkRing(void *argc)
 #endif
 
 				gettimeofday(&cur_tv, NULL);
-				if(buf_list[i].priority <= 0 && buf_list[i].status == SEND)
+				if(buf_list[i].priority < 0 && buf_list[i].status == SEND)
 				{
 					if(empty_list[i] != -1)
 					{
@@ -157,7 +157,7 @@ void* checkRing(void *argc)
 				}
 
 				gettimeofday(&cur_tv, NULL);
-				if(cur_tv.tv_sec*1000000 + cur_tv.tv_usec - buf_list[i].tv.tv_sec*1000000 - buf_list[i].tv.tv_usec > resendDelay && buf_list[i].status == SEND && buf_list[i].priority > 0)
+				if(cur_tv.tv_sec*1000000 + cur_tv.tv_usec - buf_list[i].tv.tv_sec*1000000 - buf_list[i].tv.tv_usec > resendDelay && buf_list[i].status == SEND && buf_list[i].priority >= 0)
 				{
 					buf_list[i].status = RESEND;
 				}
