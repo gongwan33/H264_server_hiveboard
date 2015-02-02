@@ -81,12 +81,15 @@ void* checkRing(void *argc)
 	{
 		int i = 0;
 		int resendDelay = rto;
+		int sendLen = 0;
+		struct timeval cur_tv;
 
 		for(i = 0; i < RING_LEN; i++)
 		{
+			sendLen = 0;
+			pthread_mutex_lock(&buf_lock);
 			if(empty_list[i] != -1)
 			{
-				int sendLen = 0;
 #if TEST_LOST
 				int rnd = 0;
 				int lost_emt = LOST_PERCENT;
@@ -107,46 +110,33 @@ void* checkRing(void *argc)
 						gettimeofday(&(buf_list[i].tv), NULL);
 						if(connectionStatus == P2P)
 						{
-							pthread_mutex_lock(&buf_lock);
 							sendLen = sendto(sockfd, buf_list[i].pointer, buf_list[i].length, 0, (struct sockaddr *)&slave_sin, sizeof(struct sockaddr_in));
-							pthread_mutex_unlock(&buf_lock);
 						}
 						else if(connectionStatus == TURN)
 						{
-							pthread_mutex_lock(&buf_lock);
 							sendLen = sendto(sockfd, buf_list[i].pointer, buf_list[i].length, 0, (struct sockaddr *)&turnaddr, sizeof(turnaddr));
-							pthread_mutex_unlock(&buf_lock);
 						}
 						else 
 						{
+							pthread_mutex_unlock(&buf_lock);
 							return; 
 						}
 
 						if(sendLen >= buf_list[i].length)
 						{
-							pthread_mutex_lock(&buf_lock);
 							buf_list[i].status = SEND;
 							buf_list[i].priority--;
-							pthread_mutex_unlock(&buf_lock);
 						}
 					}
 #if TEST_LOST
 				}
 #endif
 
-				if(sendLen > 0)
-					usleep(10000/sendLen);
-				else
-					usleep(10);
-
-				struct timeval cur_tv;
-
 				gettimeofday(&cur_tv, NULL);
 				if(buf_list[i].priority <= 0 && buf_list[i].status == SEND)
 				{
 					if(empty_list[i] != -1)
 					{
-						pthread_mutex_lock(&buf_lock);
 						if(empty_list[i] != -1 && buf_list[i].pointer != NULL)
 						{
 							free(buf_list[i].pointer);
@@ -163,21 +153,23 @@ void* checkRing(void *argc)
 
 						}
 						empty_list[i] = -1;
-						pthread_mutex_unlock(&buf_lock);
 					}
 				}
 
 				gettimeofday(&cur_tv, NULL);
 				if(cur_tv.tv_sec*1000000 + cur_tv.tv_usec - buf_list[i].tv.tv_sec*1000000 - buf_list[i].tv.tv_usec > resendDelay && buf_list[i].status == SEND && buf_list[i].priority > 0)
 				{
-					pthread_mutex_lock(&buf_lock);
 					buf_list[i].status = RESEND;
-					pthread_mutex_unlock(&buf_lock);
 				}
 
 			}
-//			else
-//				usleep(10);
+
+			pthread_mutex_unlock(&buf_lock);
+
+			if(sendLen > 0)
+				usleep(10000/sendLen);
+			else
+				usleep(10);
 		}
 	}
 
@@ -274,6 +266,7 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
 		usleep(10);
 		times++;
 	}
+	pthread_mutex_lock(&buf_lock);
 
 	if(regtv.tv_sec - lastRegTime >= RING_WAIT_TIMEOUT && lastRegTime != 0)
 	{
@@ -283,7 +276,6 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
 
 	lastRegTime = regtv.tv_sec;
 
-	pthread_mutex_lock(&buf_lock);
     buf_list[pos].index = index;
     buf_list[pos].pointer = pointer;
     buf_list[pos].priority = priority;
@@ -300,17 +292,19 @@ int unreg_buff(unsigned int index)
 	int pos = 0;
 	struct timeval gettv;
 
+	pthread_mutex_lock(&buf_lock);
 	pos = getIndexPos(index);
 
 	if(pos == -1)
+	{
+		pthread_mutex_unlock(&buf_lock);
 		return -1;
+	}
 
 	gettimeofday(&gettv, NULL);
 	unsigned long new_rtt = ((gettv.tv_sec - buf_list[pos].tv.tv_sec)*1000000 + (gettv.tv_usec - buf_list[pos].tv.tv_usec));
 	rtt = rtt*RTT_A + new_rtt - new_rtt*RTT_A;
 	rto = rtt*RTT_B;
-
-	pthread_mutex_lock(&buf_lock);
 
 	if(empty_list[pos] != -1 && buf_list[pos].pointer != NULL)
 	{
@@ -326,7 +320,6 @@ int unreg_buff(unsigned int index)
 		}
 	}
 	empty_list[pos] = -1;
-
 
 	pthread_mutex_unlock(&buf_lock);
 	return 0;

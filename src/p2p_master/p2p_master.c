@@ -26,7 +26,8 @@
 #define MTU 1000
 #define CONTROL_BUF_SIZE 2000
 
-#define server_ip_1 "192.168.1.109"
+//#define server_ip_1 "192.168.1.109"
+#define server_ip_1 "192.168.1.149"
 //#define server_ip_1 "23.89.232.109"
 
 #define USERNAME "wang"
@@ -695,7 +696,7 @@ void* recvData(void *argc)
 
 					lastIndex = head.index;
 #if PRINT
-					printf("load head: %c %d %d %d %d\n", head.logo[0], head.index, head.get_number, head.priority, (unsigned int)head.length);
+					printf("load head: %c %d %d %d %d\n", head.logo[0], head.index,  head.priority, (unsigned int)head.length, head.sliceIndex);
 #endif
 					if(recvProcessBufP - scanP - sizeof(struct load_head) >= head.length)
 					{
@@ -1013,8 +1014,8 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 	
 	int sP = 0;
 	int curLen = 0;
+	int total = len;
 	int count = 0;
-	int total = len/MTU + ((len%MTU == 0)? 0 : 1);
 	int macroParam = 0;
 	pthread_mutex_lock(&send_lock);
 	while(sP < len)
@@ -1034,13 +1035,11 @@ int JEAN_send_master(char *data, int len, unsigned char priority, unsigned char 
 		buffer = (char *)malloc(curLen + sizeof(struct load_head));
 		memcpy(lHead.logo, "JEAN", 4);
 		lHead.index = sendIndex;
-		lHead.get_number = getNum;
 		lHead.priority = (priority + macroParam)/2;
 		lHead.length = curLen;
 		lHead.direction = 1;
 		lHead.address = sP;
-		lHead.subIndex = count;
-		lHead.totalIndex = total;
+		lHead.totalLen = total;
 		lHead.sliceIndex = sliceIndex;
 
 		memcpy(buffer, &lHead, sizeof(lHead));
