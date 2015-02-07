@@ -36,7 +36,7 @@ struct buf_node
     u_int32_t index;
 	char priority;
     char *pointer;
-	u_int64_t length;
+	u_int32_t length;
     struct timeval tv;
 	unsigned char status;
 };
