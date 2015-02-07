@@ -1,7 +1,7 @@
 #ifndef RING_H
 #define RING_H
 
-#define RING_LEN 32
+#define RING_LEN 64
 #define RING_WAIT_TIMEOUT 30 //seconds
 #define RTT_A 7/8
 #define RTT_B 2

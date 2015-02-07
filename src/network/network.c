@@ -242,9 +242,6 @@ static struct audio_data *audio_data;
 /* recv command */
 /* TODO */
 
-#ifdef ENABLE_VIDEO
-extern sem_t start_camera;
-#endif
 
 sem_t start_talk;
 
@@ -937,9 +934,7 @@ void network(void)
 		perror("pthread_create");
 	}
 		printf(">>>>>in video or record data connection<<<<<\n");
-#ifdef ENABLE_VIDEO
-		sem_post(&start_camera);		/* start video only when cellphone send request ! */
-#endif
+
 	pthread_join(th1, NULL);
 while(1);
 	pthread_mutex_destroy(&AVsocket_mutex);

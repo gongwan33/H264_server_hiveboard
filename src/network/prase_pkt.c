@@ -11,6 +11,11 @@
 #include "audio.h"
 #include "network.h"
 #include <string.h>
+#include <semaphore.h>
+
+#ifdef ENABLE_VIDEO
+extern sem_t start_camera;
+#endif
 
 extern int start_measure();
 extern void enable_t_rh_sent();
@@ -37,13 +42,18 @@ int prase_packet(int opcode, u8 *buf)
         }
     }
     else{
-        switch (opcode) {
-        case 4:
-            send_video_start_resp();
-            break;
-        case 255:
-            keep_connect();
-            break;
+		switch (opcode) {
+			case 4:
+				send_video_start_resp();
+
+#ifdef ENABLE_VIDEO
+				sem_post(&start_camera);		/* start video only when cellphone send request ! */
+#endif
+
+				break;
+			case 255:
+				keep_connect();
+				break;
         case 7:
             memcpy(&video_frameinterval,buf,sizeof(unsigned long));
             // printf("video_frameinterval is %ld \n",video_frameinterval);
