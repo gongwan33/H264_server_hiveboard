@@ -190,76 +190,52 @@ void set_rec_timeout(int usec, int sec){
 }
 
 int Send_VUAP(){
-	char Sen_W;
-	Sen_W = V_UAP;
-	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) return -1;
+	struct p2p_head head;
+	memcpy(&head.logo, "VUP", 3);
+	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) 
+		return -1;
 
-	ip_info[0] = Sen_W;
-	memcpy(ip_info + 1, USERNAME, 10);
-	memcpy(ip_info + 12, PASSWD, 10);
-	memcpy(ip_info + 34, &host_sin, sizeof(struct sockaddr_in));
+	memcpy(head.data, USERNAME, 10);
+	memcpy(head.data + 10, PASSWD, 10);
+	memcpy(head.data + 20, &host_sin, sizeof(struct sockaddr_in));
 
-	sendto(sockfd, ip_info, sizeof(ip_info), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
+	sendto(sockfd, &head, sizeof(struct p2p_head), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
 	return 0;
 }
 
 int Send_CLOSE(){
-	char Sen_W;
-	Sen_W = MASTER_QUIT;
-	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) return -1;
+	struct p2p_head head;
+	memcpy(&head.logo, "QIT", 3);
 
-	ip_info[0] = Sen_W;
-	memcpy(ip_info + 1, USERNAME, 10);
-	memcpy(ip_info + 12, PASSWD, 10);
-	memcpy(ip_info + 34, &host_sin, sizeof(struct sockaddr_in));
+	memcpy(head.data, USERNAME, 10);
 
-	sendto(sockfd, ip_info, sizeof(ip_info), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
+	sendto(sockfd, &head, sizeof(struct p2p_head), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
 	return 0;
 }
 
 int Send_TURN(){
-	char Sen_W;
-	Sen_W = TURN_REQ;
-	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) return -1;
+	struct p2p_head head;
+	memcpy(&head.logo, "TRN", 3);
 
-	ip_info[0] = Sen_W;
-	memcpy(ip_info + 1, USERNAME, 10);
-	memcpy(ip_info + 12, PASSWD, 10);
-	memcpy(ip_info + 34, &host_sin, sizeof(struct sockaddr_in));
-
-	sendto(sockfd, ip_info, sizeof(ip_info), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
+	sendto(sockfd, &head, sizeof(struct p2p_head), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
 	return 0;
 }
 
 int Send_CMDOPEN(){
-	char Sen_W;
-	Sen_W = CMD_CHAN;
-	char id = 'M';
-	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) return -1;
+	struct p2p_head head;
+	memcpy(&head.logo, "CMD", 3);
+	head.data[0] = 'M';
 
-	ip_info[0] = Sen_W;
-	memcpy(ip_info + 1, USERNAME, 10);
-	memcpy(ip_info + 12, PASSWD, 10);
-	ip_info[23] = id;
-	memcpy(ip_info + 34, &host_sin, sizeof(struct sockaddr_in));
-
-	sendto(sockfd, ip_info, sizeof(ip_info), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
+	sendto(sockfd, &head, sizeof(struct p2p_head), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
 	return 0;
 }
 
 int Send_CONTROLOPEN(){
-	char Sen_W;
-	Sen_W = CONTROL_CHAN;
-	char id = 'M';
-	if(strlen(USERNAME) > 10 || strlen(PASSWD) > 10) return -1;
+	struct p2p_head head;
+	memcpy(&head.logo, "CTL", 3);
+	head.data[0] = 'M';
 
-	ip_info[0] = Sen_W;
-	memcpy(ip_info + 1, USERNAME, 10);
-	memcpy(ip_info + 12, PASSWD, 10);
-	ip_info[23] = id;
-	memcpy(ip_info + 34, &host_sin, sizeof(struct sockaddr_in));
-
-	sendto(sockfd, ip_info, sizeof(ip_info), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
+	sendto(sockfd, &head, sizeof(struct p2p_head), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
 	return 0;
 }
 
@@ -269,9 +245,13 @@ void Send_POL(char req,struct sockaddr_in * sock){
 }
 
 void Send_CMD(char Ctls, char Res){
-	ip_info[0] = Ctls;
-	ip_info[1] = Res;
-	sendto(sockfd, ip_info, sizeof(ip_info), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
+	struct p2p_head head;
+	if(Ctls == GET_REQ)
+		memcpy(head.logo, "GRQ", 3);
+	else if(Ctls == KEEP_CON)
+		memcpy(head.logo, "KEP", 3);
+	head.data[0] = Res;
+	sendto(sockfd, &head, sizeof(struct p2p_head), 0, (struct sockaddr *)&servaddr1, sizeof(servaddr1));
 }
 
 void Send_CMD_TO_SLAVE(char Ctls, char Res){
@@ -483,7 +463,6 @@ void* controlChanThread(void *argc)
 			{
 				if(controlBuf[scanP] == 'G' && controlBuf[scanP + 1] == 'E' && controlBuf[scanP + 2] == 'T')
 				{
-//					memcpy(&get, controlBuf + scanP, sizeof(struct get_head));
 					
 					if(controlBufP - scanP - sizeof(struct get_head) >= sizeof(u_int32_t))
 					{
@@ -565,7 +544,6 @@ int findIndexInBuf(char *buf, int *start, int *end, int *datLen, u_int32_t index
 		if(buf[scanP] == 'J' && buf[scanP + 1] == 'E' && buf[scanP + 2] == 'A' && buf[scanP + 3] == 'N')
 		{
 			memcpy(&head, buf + scanP, sizeof(struct load_head));
-//			printf("BackBuf: index %d", head.index);
 			if(index == head.index)
 			{
 				*start = scanP + sizeof(struct load_head);
@@ -631,7 +609,6 @@ void* recvData(void *argc)
 
 		if(recvLen <= 0)
 		{
-//			usleep(100);
 			continue;
 		}
 
@@ -653,7 +630,6 @@ void* recvData(void *argc)
 		if(getLostNum >= recordLostNum - 1)
 			pauseSign = 0;
 
-//		printf("buf back point at %d, pauseSign = %d\n", recvProcessBackBufP, pauseSign);
 		if(pauseSign == 0 && recvProcessBackBufP >= 0)
 		{
 #if PRINT
@@ -676,7 +652,6 @@ void* recvData(void *argc)
 					int lostNum = 0;
 					memcpy(&head, recvProcessBuf + scanP, sizeof(struct load_head));
 					lostNum = head.index - lastIndex;
-					//printf("lastindex %d index %d \n", lastIndex, head.index);
 
 					if(pauseSign == 1 && lostNum == 1)
 						getLostNum++;
@@ -694,7 +669,6 @@ void* recvData(void *argc)
 						    int start, end;
 						    int pri;
                             pri = findIndexInBuf(recvProcessBackBuf, &start, &end, &recvProcessBackBufP, lastIndex + 1);
-					//		printf("found pack in back %d\n", pri);
 						    if(pri >= 0)
 						    {
 								if(pri > 0)
@@ -773,7 +747,6 @@ void* recvData(void *argc)
 				memcpy(recvProcessBuf, recvProcessBuf + scanP, recvProcessBufP);
 			}
 		}
-//		usleep(100);
 	}
 
 	recvThreadRunning = 0;
