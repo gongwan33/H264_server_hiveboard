@@ -901,6 +901,15 @@ void network(void)
 		exit(1);
 	}
 
+
+#if 0
+	int data[1000];
+	int testtime = 0;
+	for(testtime = 0; testtime < 2000; testtime++)
+		JEAN_send_master(data, 1000, 10, 0, 0);
+#endif
+	
+
 	/* ---------------------------------------------------------------------------- */
 	pthread_t th1;				/* main thread for opcode command */
 

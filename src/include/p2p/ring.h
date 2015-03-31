@@ -5,6 +5,7 @@
 #define RING_WAIT_TIMEOUT 30 //seconds
 #define RTT_A 7/8
 #define RTT_B 2
+#define SEND_GAP_TIME 10
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +56,8 @@ static char checkRingRunning = 0;
 static char checkRingSign = 0;
 unsigned int page = 0;
 static pthread_t checkRing_t;
+struct timeval lastSendTime;
+long sendGap = 0;
 
 extern int sockfd;
 extern struct sockaddr_in slave_sin, turnaddr;
@@ -84,9 +87,14 @@ void* checkRing(void *argc)
 	while(checkRingSign == 1)
 	{
 		int i = 0;
-		int resendDelay = rto;
+		int resendDelay = 0;
 		int sendLen = 0;
 		struct timeval cur_tv;
+
+		if(rto < 500000)
+			resendDelay = rto;
+		else
+			resendDelay = 800000;
 
 		for(i = 0; i < RING_LEN; i++)
 		{
@@ -116,6 +124,16 @@ void* checkRing(void *argc)
 							gettimeofday(&(buf_list[i].tv), NULL);
 							totalSend++;
 						}
+						
+						struct timeval sendT;
+						while(sendGap < SEND_GAP_TIME)
+						{
+							gettimeofday(&sendT, NULL);
+					        sendGap = sendT.tv_sec*1000 + sendT.tv_usec/1000 - lastSendTime.tv_sec*1000 - lastSendTime.tv_usec/1000;
+							usleep(100);
+						}
+						memcpy(&lastSendTime, &sendT, sizeof(struct timeval));
+
 						if(connectionStatus == P2P)
 						{
 							sendLen = sendto(sockfd, buf_list[i].pointer, buf_list[i].length, 0, (struct sockaddr *)&slave_sin, sizeof(struct sockaddr_in));
@@ -176,10 +194,6 @@ void* checkRing(void *argc)
 
 			pthread_mutex_unlock(&buf_lock);
 
-			if(sendLen > 0)
-				usleep(10000/sendLen);
-			else
-				usleep(100);
 		}
 	}
 
@@ -315,16 +329,20 @@ int unreg_buff(unsigned int index)
 		return -1;
 	}
 
+    unsigned long new_rtt;
 	if(buf_list[pos].resendSign != 1)
 	{
 		gettimeofday(&gettv, NULL);
-		unsigned long new_rtt = ((gettv.tv_sec - buf_list[pos].tv.tv_sec)*1000000 + (gettv.tv_usec - buf_list[pos].tv.tv_usec));
+		new_rtt = ((gettv.tv_sec - buf_list[pos].tv.tv_sec)*1000000 + (gettv.tv_usec - buf_list[pos].tv.tv_usec));
 		rtt = rtt*RTT_A + new_rtt - new_rtt*RTT_A;
-		rto = rtt*RTT_B;
+		rto = (int)rtt*RTT_B;
+		
+#if PRINT_TIME
+		printf("rto = %d, new_rtt = %d, rtt = %d\n", rto, new_rtt, (int)rtt);
+#endif
 	}
 
 #if PRINT_TIME
-	printf("rto = %d\n", rto);
 	printf("useless resend = %d, resendTimes = %d, total send = %d\n", uselessResend, resendTimes, totalSend);
 #endif
 
