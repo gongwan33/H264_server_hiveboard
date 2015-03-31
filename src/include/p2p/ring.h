@@ -1,7 +1,7 @@
 #ifndef RING_H
 #define RING_H
 
-#define RING_LEN 64
+#define RING_LEN 64 
 #define RING_WAIT_TIMEOUT 30 //seconds
 #define RTT_A 7/8
 #define RTT_B 2
@@ -30,6 +30,9 @@ char *getPointerByIndex(unsigned int index, int *len, int *Prio);
 unsigned long lastRegTime = 0;
 int rto = 50000;
 unsigned long rtt = 0;
+int uselessResend = 0;
+int resendTimes = 0;
+int totalSend = 0;
 
 struct buf_node
 {
@@ -39,6 +42,7 @@ struct buf_node
 	u_int32_t length;
     struct timeval tv;
 	unsigned char status;
+	unsigned char resendSign;
 };
 
 static struct buf_node buf_list[RING_LEN];
@@ -107,7 +111,11 @@ void* checkRing(void *argc)
 						struct load_head head;
 
 						*(buf_list[i].pointer + ((void *)&(head.priority) - (void *)&head)) = buf_list[i].priority;
-						gettimeofday(&(buf_list[i].tv), NULL);
+						if(buf_list[i].resendSign != 1)
+						{
+							gettimeofday(&(buf_list[i].tv), NULL);
+							totalSend++;
+						}
 						if(connectionStatus == P2P)
 						{
 							sendLen = sendto(sockfd, buf_list[i].pointer, buf_list[i].length, 0, (struct sockaddr *)&slave_sin, sizeof(struct sockaddr_in));
@@ -160,6 +168,8 @@ void* checkRing(void *argc)
 				if(cur_tv.tv_sec*1000000 + cur_tv.tv_usec - buf_list[i].tv.tv_sec*1000000 - buf_list[i].tv.tv_usec > resendDelay && buf_list[i].status == SEND && buf_list[i].priority >= 0)
 				{
 					buf_list[i].status = RESEND;
+					buf_list[i].resendSign = 1;
+					resendTimes++;
 				}
 
 			}
@@ -169,7 +179,7 @@ void* checkRing(void *argc)
 			if(sendLen > 0)
 				usleep(10000/sendLen);
 			else
-				usleep(10);
+				usleep(100);
 		}
 	}
 
@@ -283,6 +293,7 @@ int reg_buff(unsigned int index, char *pointer, unsigned char priority, int len)
     buf_list[pos].priority = priority;
 	buf_list[pos].length = len;
 	buf_list[pos].status = READY;
+	buf_list[pos].resendSign = 0;
     empty_list[pos] = 1;
 	pthread_mutex_unlock(&buf_lock);
 	seqIndex++;
@@ -300,13 +311,22 @@ int unreg_buff(unsigned int index)
 	if(pos == -1)
 	{
 		pthread_mutex_unlock(&buf_lock);
+		uselessResend++;
 		return -1;
 	}
 
-	gettimeofday(&gettv, NULL);
-	unsigned long new_rtt = ((gettv.tv_sec - buf_list[pos].tv.tv_sec)*1000000 + (gettv.tv_usec - buf_list[pos].tv.tv_usec));
-	rtt = rtt*RTT_A + new_rtt - new_rtt*RTT_A;
-	rto = rtt*RTT_B;
+	if(buf_list[pos].resendSign != 1)
+	{
+		gettimeofday(&gettv, NULL);
+		unsigned long new_rtt = ((gettv.tv_sec - buf_list[pos].tv.tv_sec)*1000000 + (gettv.tv_usec - buf_list[pos].tv.tv_usec));
+		rtt = rtt*RTT_A + new_rtt - new_rtt*RTT_A;
+		rto = rtt*RTT_B;
+	}
+
+#if PRINT_TIME
+	printf("rto = %d\n", rto);
+	printf("useless resend = %d, resendTimes = %d, total send = %d\n", uselessResend, resendTimes, totalSend);
+#endif
 
 	if(empty_list[pos] != -1 && buf_list[pos].pointer != NULL)
 	{

@@ -37,7 +37,7 @@
 #define local_port 6788
 #define server_port 61000
 //#define server_ip "23.89.232.109"
-#define server_ip "192.168.1.149"
+#define server_ip "103.226.127.42"
 //#define server_ip "192.168.1.109"
 
 #define BACKLOG 	10

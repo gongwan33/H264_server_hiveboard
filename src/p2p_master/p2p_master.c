@@ -27,7 +27,7 @@
 #define CONTROL_BUF_SIZE 2000
 
 //#define server_ip_1 "192.168.1.109"
-#define server_ip_1 "192.168.1.149"
+#define server_ip_1 "103.226.127.42"
 //#define server_ip_1 "23.89.232.109"
 
 #define USERNAME "wang"
@@ -859,7 +859,7 @@ int JEAN_init_master(int serverPort, int localPort, char *setIp)
 			for(i = 0; i < MAX_TRY + 1 ; i++){
 				Send_CMD(GET_REQ, 0x08);
 				char result = 0;
-
+				
 				recvfrom(sockfd, Ctl_Rec, sizeof(Ctl_Rec), 0, (struct sockaddr *)&recv_sin, &recv_sin_len);
 				if(Ctl_Rec[0] == GET_REQ && Ctl_Rec[1] == 0x9) break;
 			}
@@ -949,6 +949,7 @@ int JEAN_init_master(int serverPort, int localPort, char *setIp)
 				if(controlChanThreadRunning == 0)
 				{
 					controlChanThreadRunning = 1;
+
 					pthread_create(&control_t, NULL, controlChanThread, NULL);
 				}
 
